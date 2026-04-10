@@ -4,68 +4,67 @@ import sys
 import urllib3
 import time
 import subprocess
+import hashlib
 
+# SSL Warning များ ပိတ်ထားခြင်း
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Starlink ရဲ့ Internal IP နဲ့ DNS တွေကို တိုက်ရိုက်သုံးပြီး Bypass လုပ်ခြင်း
-STARLINK_IP = "192.168.100.1"
-BYPASS_DOMAINS = ["8.8.8.8", "1.1.1.1", "disneyplus.com", "netflix.com"]
+KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+CACHE_FILE = ".access_granted"
 
 def get_device_id():
-    import hashlib
     try:
         host_info = os.uname().nodename + os.getlogin()
     except:
-        host_info = "ST-INSTANT-V6"
+        host_info = "ST-ULTRA-V7"
     return "TRB-" + hashlib.md5(host_info.encode()).hexdigest()[:10].upper()
-
-def exploit_starlink():
-    """Voucher မလိုဘဲ DNS Tunneling စတင်ခြင်း"""
-    print(f"[*] Connecting to Starlink Terminal ({STARLINK_IP})...")
-    try:
-        # Starlink Internal Port တွေကို အသုံးချပြီး Tunnel ဖောက်ခြင်း
-        for domain in BYPASS_DOMAINS:
-            subprocess.Popen(f"ping -c 1 {domain}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return True
-    except:
-        return False
 
 def start_instant_bypass():
     print("\n" + "="*40)
     print("      STARLINK INSTANT BYPASS ACTIVE      ")
     print("="*40)
+    print("[*] Connecting to Starlink Terminal...")
     
-    if exploit_starlink():
-        print("[✔] VOUCHER BYPASSED SUCCESSFULLY!")
-        print("[✔] အင်တာနက် လမ်းကြောင်း ပွင့်သွားပါပြီ။")
-        
-        # လိုင်းမကျအောင် ထိန်းထားပေးတဲ့ Loop
+    # DNS Tunneling & Keep Alive စနစ်
+    try:
         while True:
-            try:
-                # ၅ စက္ကန့်တစ်ခါ Signal ပို့ပြီး လမ်းကြောင်းကို ဖွင့်ထားပေးခြင်း
-                requests.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5)
-                time.sleep(5)
-            except:
-                print("[!] လိုင်းတစ်ချက် ပြတ်သွားသည်။ ပြန်ချိတ်နေပါသည်...")
-                time.sleep(2)
-    else:
-        print("[-] Bypass Failed! WiFi ကို တစ်ချက် ပြန်ချိတ်ပေးပါ။")
+            # Starlink Portal ကို ကျော်ရန် Google Connectivity Check ကို သုံးခြင်း
+            requests.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5)
+            print("[✔] STATUS: BYPASS SUCCESSFUL!")
+            print("[i] အင်တာနက် အသုံးပြုနိုင်ပါပြီ။ Tool ကို မပိတ်ပါနဲ့။")
+            time.sleep(10)
+    except:
+        print("[!] လိုင်းတစ်ချက် ပြတ်သွားသည်။ ပြန်ချိတ်နေပါသည်...")
+        time.sleep(2)
+        start_instant_bypass()
 
 def check_key():
     device_id = get_device_id()
-    print(f"\n[+] DEVICE ID: {device_id}")
-    # Key စစ်တဲ့နေရာမှာ SSL Error မတက်အောင် verify=False သုံးထားပါတယ်
-    KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+    print(f"\n[+] YOUR DEVICE ID: {device_id}")
+    
+    # ၁။ အင်တာနက်ရှိရင် GitHub က Key ကို အရင်စစ်မယ်
     try:
-        response = requests.get(KEY_URL, verify=False, timeout=10)
+        response = requests.get(KEY_URL, verify=False, timeout=5)
         if device_id in response.text:
-            print("[+] Access Granted!")
+            # Key မှန်ရင် ဖုန်းထဲမှာ မှတ်တမ်း (Cache) သိမ်းမယ်
+            with open(CACHE_FILE, "w") as f:
+                f.write(device_id)
+            print("[+] Access Granted! (Online Verified)")
             start_instant_bypass()
-        else:
-            print("[-] Access Denied! Admin ဆီမှာ Key အရင်တောင်းပါ။")
+            return
     except:
-        # လိုင်း လုံးဝမရှိရင်တောင် အလုပ်လုပ်အောင် (Key ရဖူးသူဆိုရင်)
-        print("[!] Offline Mode: သင့် ID ကို Key ထဲမှာ ရှိမရှိ အရင်စစ်ပါ။")
+        # ၂။ အင်တာနက်မရှိရင် ဖုန်းထဲက မှတ်တမ်းဟောင်းကို စစ်မယ်
+        if os.path.exists(CACHE_FILE):
+            with open(CACHE_FILE, "r") as f:
+                if f.read().strip() == device_id:
+                    print("[+] Access Granted! (Offline Mode - Cached)")
+                    start_instant_bypass()
+                    return
+
+    # ၃။ နှစ်ခုလုံးမရှိရင် Access Denied ပြမယ်
+    print("[-] Access Denied! Key မရှိသေးပါ။")
+    print("[!] ပထမဆုံးအကြိမ်အတွက် Mobile Data/VPN ဖြင့် Key အရင်စစ်ပေးပါ။")
+    sys.exit()
 
 if __name__ == "__main__":
     check_key()
