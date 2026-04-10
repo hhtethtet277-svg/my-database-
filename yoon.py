@@ -1,12 +1,14 @@
 import os
 import requests
 import sys
+import urllib3
 
-# Key စစ်ဆေးမည့် Link
+# SSL Error မတက်အောင် warning တွေကို ပိတ်ထားခြင်း
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
 
 def get_device_id():
-    # ရိုးရှင်းသော Device ID ထုတ်နည်း (ဖုန်းမတူရင် ID မတူအောင်လို့ပါ)
     import hashlib
     host_info = os.uname().nodename + os.getlogin()
     return "TRB-" + hashlib.md5(host_info.encode()).hexdigest()[:10].upper()
@@ -16,10 +18,10 @@ def check_key():
     print(f"\n[+] YOUR DEVICE ID: {device_id}")
     
     try:
-        response = requests.get(KEY_URL)
+        # verify=False ထည့်ပြီး SSL စစ်ဆေးမှုကို ကျော်လိုက်တာဖြစ်ပါတယ်
+        response = requests.get(KEY_URL, verify=False)
         keys_list = response.text.splitlines()
         
-        # GitHub က key.txt ထဲမှာ Device ID ရှိမရှိ စစ်မယ်
         authorized = False
         for line in keys_list:
             if device_id in line:
@@ -35,14 +37,12 @@ def check_key():
         start_tool()
 
     except Exception as e:
-        print(f"[-] Error: အင်တာနက် ချိတ်ဆက်မှု စစ်ဆေးပါ သို့မဟုတ် {e}")
+        print(f"[-] Error: {e}")
 
 def start_tool():
-    # ဒီနေရာမှာ သင့်ရဲ့ Starlink Scan ဖတ်တဲ့ မူရင်း Logic ကို ထည့်ထားပါတယ်
     print("\n--- STARLINK MONITORING SYSTEM ---")
     print("STATUS : CONNECTED TO 192.168.100.1")
     print("SIGNAL : ACTIVE (Port 9200 is OPEN)")
-    # သင့်ရဲ့ တခြား Code အစိတ်အပိုင်းတွေကို ဒီအောက်မှာ ဆက်ထည့်နိုင်ပါတယ်
 
 if __name__ == "__main__":
     check_key()
