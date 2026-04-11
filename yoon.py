@@ -17,7 +17,7 @@ init(autoreset=True)
 # ===============================
 # LICENSE CONFIG (FIXED)
 # ===============================
-GITHUB_URL = "https://raw.githubusercontent.com/htethtet277-svg/my-database-/main/key.txt"
+GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
 KEY_FILE = os.path.join(os.path.expanduser("~"), ".device_key")
 
 # ===============================
