@@ -1,12 +1,8 @@
 import os
+import socket
+import threading
 import requests
 import urllib3
-import time
-import threading
-import socketserver
-import http.server
-import base64
-from datetime import datetime
 from colorama import Fore, Back, Style, init
 
 # SSL Warning ပိတ်ရန်နှင့် Colorama စတင်ရန်
@@ -19,35 +15,6 @@ init(autoreset=True)
 GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
 USER_KEY = "AF8BE771-03B" 
 PROXY_PORT = 8080
-stop_event = threading.Event()
-
-# ===============================
-# PROXY SERVER LOGIC (အခြား App များအတွက်)
-# ===============================
-class ProxyHandler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Moe Yu Bypass Engine Active")
-
-def start_proxy():
-    try:
-        # 0.0.0.0 သုံးထား၍ ဖုန်းထဲက App အားလုံး ဝင်ချိတ်နိုင်ပါသည်
-        with socketserver.TCPServer(("0.0.0.0", PROXY_PORT), ProxyHandler) as httpd:
-            print(f"{Fore.GREEN}[✔] Proxy Engine ready on Port: {PROXY_PORT}")
-            httpd.serve_forever()
-    except Exception as e:
-        print(f"{Fore.RED}[!] Proxy Error: {e}")
-
-# ===============================
-# V2RAY CONFIG GENERATOR
-# ===============================
-def generate_v2ray_link():
-    # v2rayNG အတွက် SOCKS5 Link ထုတ်ပေးခြင်း (Format အမှန်)
-    config_info = f"127.0.0.1:{PROXY_PORT}"
-    encoded_info = base64.b64encode(config_info.encode()).decode()
-    v2ray_link = f"socks://{encoded_info}#Moe_Yu_Bypass"
-    return v2ray_link
 
 def h_banner():
     os.system('clear')
@@ -59,12 +26,70 @@ def h_banner():
     print(f"{Fore.CYAN} ██║  ██║███████╗██║  ██║██████╔╝██████╔╝██║██║ ╚████║")
     print(f"{Fore.CYAN} ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚════╝")
     print(f"{Fore.MAGENTA}{'='*55}")
-    print(f"{Fore.WHITE}{Back.BLUE}      ALADDIN TURBO BYPASS | OWNER: MOE YU      ")
+    print(f"{Fore.WHITE}{Back.BLUE}      ALADDIN HTTPS BYPASS | OWNER: MOE YU      ")
     print(f"{Style.RESET_ALL}{Fore.MAGENTA}{'='*55}\n")
 
+# ===============================
+# HTTPS PROXY ENGINE (For Wi-Fi Settings)
+# ===============================
+def handle_client(client_socket):
+    try:
+        # Request ကို လက်ခံခြင်း
+        request = client_socket.recv(4096).decode('latin-1')
+        if not request: return
+        
+        first_line = request.split('\n')[0]
+        method = first_line.split(' ')[0]
+        
+        # HTTPS လမ်းကြောင်းများကို တိုက်ရိုက်ချိတ်ပေးခြင်း
+        if method == "CONNECT":
+            host_port = first_line.split(' ')[1]
+            host, port = host_port.split(':')
+            
+            # Target Server သို့ ချိတ်ဆက်ခြင်း
+            remote_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            remote_socket.connect((host, int(port)))
+            client_socket.send(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            
+            # Data Bridge လုပ်ခြင်း
+            def bridge(src, dest):
+                try:
+                    while True:
+                        data = src.recv(4096)
+                        if not data: break
+                        dest.sendall(data)
+                except: pass
+
+            threading.Thread(target=bridge, args=(client_socket, remote_socket), daemon=True).start()
+            bridge(remote_socket, client_socket)
+        else:
+            # ရိုးရိုး HTTP Requests များအတွက်
+            client_socket.send(b"HTTP/1.1 501 Unsupported Method\r\n\r\n")
+    except: pass
+    finally: client_socket.close()
+
+def start_engine():
+    try:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(('0.0.0.0', PROXY_PORT))
+        server.listen(10)
+        print(f"{Fore.GREEN}[✔] Aladdin Engine is Live on Port: {PROXY_PORT}")
+        print(f"{Fore.YELLOW}[i] Wi-Fi Proxy: 127.0.0.1 | Port: {PROXY_PORT}")
+        
+        while True:
+            client, addr = server.accept()
+            # print(f"{Fore.BLACK}{Back.WHITE} [LOG] Connection from: {addr[0]} ") # Log ကြည့်ချင်လျှင် ဖွင့်ပါ
+            threading.Thread(target=handle_client, args=(client,), daemon=True).start()
+    except Exception as e:
+        print(f"{Fore.RED}[!] Server Error: {e}")
+
+# ===============================
+# LICENSE VERIFICATION
+# ===============================
 def verify_license():
     h_banner()
-    print(f"{Fore.YELLOW}[i] Checking security clearance...")
+    print(f"{Fore.YELLOW}[i] Validating Access...")
     try:
         response = requests.get(GITHUB_URL, timeout=15, verify=False)
         if response.status_code == 200:
@@ -73,38 +98,14 @@ def verify_license():
                 key_from_server, exp_date_str = raw_text.split("|")
                 if key_from_server.strip() == USER_KEY:
                     print(f"{Fore.CYAN}[+] Status: {Fore.BLACK}{Back.GREEN} ACTIVE ")
-                    print(f"{Fore.WHITE}└─ Expire Date: {Fore.YELLOW}{exp_date_str.strip()}")
+                    print(f"{Fore.WHITE}└─ Security Date: {Fore.YELLOW}{exp_date_str.strip()}")
                     return True
-        print(f"{Fore.RED}\n❌ ERROR: KEY NOT REGISTERED")
         return False
     except:
-        print(f"{Fore.RED}\n❌ ERROR: CONNECTION FAILED")
         return False
 
-def start_bypass_process():
-    print(f"{Fore.CYAN}[*] Launching Turbo Engine...")
-    
-    # Proxy ကို background မှာ run ရန်
-    proxy_thread = threading.Thread(target=start_proxy, daemon=True)
-    proxy_thread.start()
-    
-    # Config Link ထုတ်ပေးရန်
-    link = generate_v2ray_link()
-    
-    print(f"\n{Fore.WHITE}{Back.MAGENTA}  V2RAYNG CONFIG LINK (COPY THIS):  ")
-    print(f"{Fore.YELLOW}{link}")
-    print(f"{Fore.WHITE}{Back.MAGENTA}{' '*36}\n")
-    
-    print(f"{Fore.GREEN}✅ Access Granted! Everything is ready.")
-    
-    while not stop_event.is_set():
-        print(f"{Fore.YELLOW}[•] Bypass Engine Running Optimized...         ", end="\r")
-        time.sleep(5)
-
 if __name__ == "__main__":
-    try:
-        if verify_license():
-            start_bypass_process()
-    except KeyboardInterrupt:
-        stop_event.set()
-        print(f"\n{Fore.RED}Turbo Engine Shutdown...{Fore.RESET}")
+    if verify_license():
+        start_engine()
+    else:
+        print(f"{Fore.RED}\n❌ ACCESS DENIED: INVALID KEY")
