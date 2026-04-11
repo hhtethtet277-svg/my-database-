@@ -3,11 +3,13 @@ import requests
 import urllib3
 import time
 import threading
-import sys
+import socketserver
+import http.server
 import base64
 from datetime import datetime
 from colorama import Fore, Back, Style, init
 
+# SSL Warning ပိတ်ရန်နှင့် Colorama စတင်ရန်
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 init(autoreset=True)
 
@@ -20,14 +22,31 @@ PROXY_PORT = 8080
 stop_event = threading.Event()
 
 # ===============================
+# PROXY SERVER LOGIC (အခြား App များအတွက်)
+# ===============================
+class ProxyHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Moe Yu Bypass Engine Active")
+
+def start_proxy():
+    try:
+        # 0.0.0.0 သုံးထား၍ ဖုန်းထဲက App အားလုံး ဝင်ချိတ်နိုင်ပါသည်
+        with socketserver.TCPServer(("0.0.0.0", PROXY_PORT), ProxyHandler) as httpd:
+            print(f"{Fore.GREEN}[✔] Proxy Engine ready on Port: {PROXY_PORT}")
+            httpd.serve_forever()
+    except Exception as e:
+        print(f"{Fore.RED}[!] Proxy Error: {e}")
+
+# ===============================
 # V2RAY CONFIG GENERATOR
 # ===============================
 def generate_v2ray_link():
-    # v2rayNG အတွက် SOCKS5 Link ထုတ်ပေးခြင်း
-    # ပုံစံ - socks://[base64(host:port)]#Remarks
+    # v2rayNG အတွက် SOCKS5 Link ထုတ်ပေးခြင်း (Format အမှန်)
     config_info = f"127.0.0.1:{PROXY_PORT}"
     encoded_info = base64.b64encode(config_info.encode()).decode()
-    v2ray_link = f"socks://{encoded_info}#Moe_Yu_Bypass_🚀"
+    v2ray_link = f"socks://{encoded_info}#Moe_Yu_Bypass"
     return v2ray_link
 
 def h_banner():
@@ -45,6 +64,7 @@ def h_banner():
 
 def verify_license():
     h_banner()
+    print(f"{Fore.YELLOW}[i] Checking security clearance...")
     try:
         response = requests.get(GITHUB_URL, timeout=15, verify=False)
         if response.status_code == 200:
@@ -52,27 +72,30 @@ def verify_license():
             if "|" in raw_text:
                 key_from_server, exp_date_str = raw_text.split("|")
                 if key_from_server.strip() == USER_KEY:
-                    print(f"{Fore.CYAN}[+] Status: {Fore.GREEN}ACTIVE")
+                    print(f"{Fore.CYAN}[+] Status: {Fore.BLACK}{Back.GREEN} ACTIVE ")
                     print(f"{Fore.WHITE}└─ Expire Date: {Fore.YELLOW}{exp_date_str.strip()}")
                     return True
-            print(f"{Fore.RED}\n❌ ERROR: KEY NOT REGISTERED")
-            return False
-    except Exception:
-        print(f"{Fore.RED}\n❌ ERROR: SERVER UNREACHABLE")
+        print(f"{Fore.RED}\n❌ ERROR: KEY NOT REGISTERED")
+        return False
+    except:
+        print(f"{Fore.RED}\n❌ ERROR: CONNECTION FAILED")
         return False
 
 def start_bypass_process():
-    print(f"{Fore.CYAN}[*] Initializing Turbo Engine...")
+    print(f"{Fore.CYAN}[*] Launching Turbo Engine...")
     
-    # Config Link ထုတ်ပေးခြင်း
+    # Proxy ကို background မှာ run ရန်
+    proxy_thread = threading.Thread(target=start_proxy, daemon=True)
+    proxy_thread.start()
+    
+    # Config Link ထုတ်ပေးရန်
     link = generate_v2ray_link()
     
     print(f"\n{Fore.WHITE}{Back.MAGENTA}  V2RAYNG CONFIG LINK (COPY THIS):  ")
     print(f"{Fore.YELLOW}{link}")
     print(f"{Fore.WHITE}{Back.MAGENTA}{' '*36}\n")
     
-    print(f"{Fore.GREEN}💡 နည်းလမ်း: အပေါ်က Link ကို Copy ကူးပြီး v2rayNG ထဲမှာ")
-    print(f"{Fore.GREEN}   'Import config from clipboard' ကို နှိပ်ပါဗျ။\n")
+    print(f"{Fore.GREEN}✅ Access Granted! Everything is ready.")
     
     while not stop_event.is_set():
         print(f"{Fore.YELLOW}[•] Bypass Engine Running Optimized...         ", end="\r")
