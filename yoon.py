@@ -15,7 +15,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 init(autoreset=True)
 
 # ===============================
-# CONFIGURATION
+# CONFIGURATION (FIXED LINK)
 # ===============================
 GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
 KEY_FILE = os.path.join(os.path.expanduser("~"), ".device_key")
@@ -47,8 +47,8 @@ def verify_license():
     print(f"{Fore.YELLOW}[i] Checking Security Clearance...")
     print(f"{Fore.WHITE}└─ Your Device ID: {Fore.GREEN}{user_key}")
     
-    # ၁။ GitHub ကို ချိတ်ဆက်ရန် ကြိုးစားခြင်း (Online Check)
     try:
+        # GitHub ကနေ Data လှမ်းယူမယ်
         response = requests.get(GITHUB_URL, timeout=10)
         if response.status_code == 200:
             lines = response.text.splitlines()
@@ -59,42 +59,29 @@ def verify_license():
                     exp_date_str = parts[1].strip()
                     
                     if key == user_key:
-                        # ရက်စွဲ စစ်ဆေးခြင်း
                         expiry_date = datetime.strptime(exp_date_str, "%Y-%m-%d")
                         if datetime.now() < expiry_date:
-                            # Cache သိမ်းဆည်းခြင်း
+                            # အောင်မြင်ရင် Cache သိမ်းမယ်
                             with open(CACHE_FILE, "w") as f: f.write(f"{user_key}|{exp_date_str}")
-                            print(f"{Fore.GREEN}[+] Status: ONLINE ACTIVE")
+                            print(f"\n{Fore.GREEN}[+] Status: ONLINE ACTIVE")
                             print(f"{Fore.WHITE}└─ Expire Date: {Fore.YELLOW}{exp_date_str}")
                             return True
-                        else:
-                            print(f"{Fore.RED}❌ LICENSE EXPIRED (သက်တမ်းကုန်ဆုံးပါပြီ)")
-                            sys.exit()
     except:
-        # ၂။ အင်တာနက်မရှိလျှင် Cache ကို စစ်ဆေးခြင်း (Offline Check)
+        # အင်တာနက်မရှိရင် Cache ကို စစ်မယ်
         if os.path.exists(CACHE_FILE):
             with open(CACHE_FILE, "r") as f:
-                cached_data = f.read().strip().split("|")
-                if cached_data[0] == user_key:
-                    expiry_date = datetime.strptime(cached_data[1], "%Y-%m-%d")
-                    if datetime.now() < expiry_date:
-                        print(f"{Fore.CYAN}[+] Status: OFFLINE ACTIVE (No Internet)")
-                        print(f"{Fore.WHITE}└─ Expire Date: {Fore.YELLOW}{cached_data[1]}")
+                c_data = f.read().strip().split("|")
+                if c_data[0] == user_key:
+                    if datetime.now() < datetime.strptime(c_data[1], "%Y-%m-%d"):
+                        print(f"\n{Fore.CYAN}[+] Status: OFFLINE ACTIVE")
                         return True
 
     print(f"\n{Fore.RED}❌ ERROR: ACCESS DENIED!")
-    print(f"{Fore.YELLOW}[!] Voucher မရှိလျှင် ပထမဆုံးတစ်ကြိမ် Online ရှိစဉ် Run ထားရန်လိုသည်။")
-    print(f"{Fore.WHITE}└─ လိုအပ်ပါက Owner ထံသို့ ID ပေး၍ သက်တမ်းတိုးပါ။")
+    print(f"{Fore.YELLOW}[!] GitHub Link သို့မဟုတ် ID/Date မှားယွင်းနေပါသည်။")
     sys.exit()
-
-def start_bypass_process():
-    print(f"\n{Fore.MAGENTA}[*] Initializing Bypass Engine...")
-    time.sleep(1)
-    # ဤနေရာတွင် သင်၏ Bypass Logic များကို ဆက်လက်ထည့်သွင်းနိုင်သည်
-    while True:
-        print(f"{Fore.GREEN}[✓] Pulse Active... Check your browser.", end="\r")
-        time.sleep(2)
 
 if __name__ == "__main__":
     if verify_license():
-        start_bypass_process()
+        print(f"\n{Fore.GREEN}[✓] Bypass Engine Started Successfully!")
+        while True:
+            time.sleep(10)
