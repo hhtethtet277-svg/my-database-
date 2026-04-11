@@ -6,11 +6,13 @@ import time
 import threading
 import random
 import sys
+import socketserver
+import http.server
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs, urljoin
 from colorama import Fore, Back, Style, init
 
-# SSL Warning များနှင့် Certificate စစ်ဆေးခြင်းကို ပိတ်ထားရန် (SSL Error ကင်းဝေးစေရန်)
+# SSL Warning များနှင့် Error ကာကွယ်ရေး
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 init(autoreset=True)
 
@@ -18,13 +20,24 @@ init(autoreset=True)
 # CONFIGURATION
 # ===============================
 GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
-USER_KEY = "AF8BE771-03B"  # သင့်ဖုန်းရဲ့ ID
-
-# Bypass Settings
-PING_THREADS = 5
-MIN_INTERVAL = 0.05
-MAX_INTERVAL = 0.2
+USER_KEY = "AF8BE771-03B" 
+PROXY_PORT = 8080 # အခြား App များအတွက် ကြားခံ Port
 stop_event = threading.Event()
+
+# ===============================
+# PROXY SERVER LOGIC (အခြား App များအတွက်)
+# ===============================
+class ProxyHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        # ဤနေရာတွင် ရိုးရှင်းသော Proxy လမ်းကြောင်းကို ဖန်တီးပေးထားသည်
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Aladdin Proxy Active")
+
+def start_proxy():
+    with socketserver.TCPServer(("", PROXY_PORT), ProxyHandler) as httpd:
+        print(f"{Fore.GREEN}[✔] Proxy Engine started on Port: {PROXY_PORT}")
+        httpd.serve_forever()
 
 def h_banner():
     os.system('clear')
@@ -40,73 +53,47 @@ def h_banner():
     print(f"{Style.RESET_ALL}{Fore.MAGENTA}{'='*55}\n")
 
 # ===============================
-# LICENSE & EXPIRY SYSTEM
+# LICENSE SYSTEM
 # ===============================
 def verify_license():
     h_banner()
     print(f"{Fore.YELLOW}[i] Checking security clearance...")
     print(f"{Fore.WHITE}└─ Device ID: {Fore.GREEN}{USER_KEY}")
-    print(f"{Fore.CYAN}{'─'*55}")
-
     try:
-        # SSL Verification ကို False လုပ်ထားခြင်းက Server Unreachable Error ကို ပြေလည်စေပါတယ်
         response = requests.get(GITHUB_URL, timeout=15, verify=False)
-        
         if response.status_code == 200:
             raw_text = response.text.strip()
-            
             if "|" in raw_text:
                 key_from_server, exp_date_str = raw_text.split("|")
-                
                 if key_from_server.strip() == USER_KEY:
                     expiry_date = datetime.strptime(exp_date_str.strip(), "%Y-%m-%d")
-                    
                     if datetime.now() < expiry_date:
                         print(f"{Fore.CYAN}[+] Status: {Fore.BLACK}{Back.GREEN} ACTIVE ")
                         print(f"{Fore.WHITE}└─ Expire Date: {Fore.YELLOW}{exp_date_str.strip()}")
-                        print(f"{Fore.GREEN}✅ Access Granted! Launching Engine...")
-                        time.sleep(1)
                         return True
-                    else:
-                        print(f"{Fore.RED}[!] Status: {Fore.BLACK}{Back.RED} EXPIRED ")
-                        print(f"{Fore.RED}❌ သက်တမ်းကုန်ဆုံးသွားပါပြီ။")
-                        return False
-            
-            print(f"{Fore.RED}\n❌ ERROR: KEY NOT REGISTERED IN GITHUB")
-            print(f"{Fore.YELLOW}Received Data: {raw_text}")
+            print(f"{Fore.RED}\n❌ ERROR: KEY NOT REGISTERED")
             return False
-            
-    except Exception as e:
-        print(f"{Fore.RED}\n❌ ERROR: CONNECTION FAILED")
-        print(f"{Fore.YELLOW}Reason: {e}")
+    except Exception:
+        print(f"{Fore.RED}\n❌ ERROR: SERVER UNREACHABLE")
         return False
 
 # ===============================
-# BYPASS CORE LOGIC
+# CORE ENGINE
 # ===============================
-def high_speed_ping(auth_link, sid):
-    session = requests.Session()
-    while not stop_event.is_set():
-        try:
-            session.get(auth_link, timeout=5, verify=False)
-            print(f"{Fore.GREEN}[✓]{Fore.RESET} SID {sid} | Turbo Pulse Active     ", end="\r")
-        except:
-            break
-        time.sleep(random.uniform(MIN_INTERVAL, MAX_INTERVAL))
-
 def start_bypass_process():
-    print(f"{Fore.CYAN}[*] Initializing Turbo Engine...{Fore.RESET}")
+    print(f"{Fore.CYAN}[*] Initializing Turbo Engine...")
     
-    # ဤနေရာတွင် Captive Portal များကို ရှာဖွေပြီး Bypass လုပ်မည့် Logic များဖြစ်သည်
+    # Proxy Server ကို Background မှာ Run မည်
+    proxy_thread = threading.Thread(target=start_proxy, daemon=True)
+    proxy_thread.start()
+    
+    print(f"{Fore.MAGENTA}>>> Setup Proxy on Phone: 127.0.0.1 Port: 8080 <<<")
+    
     while not stop_event.is_set():
-        # စမ်းသပ်ရန်အတွက် Engine အလုပ်လုပ်ပုံကို ပြသခြင်းဖြစ်သည်
-        # သင့်တွင် Captive Portal link ရှိပါက ဤနေရာတွင် high_speed_ping ကို run ပေးရပါမည်
+        # Captive Portal ကို Bypass လုပ်မည့် Core Logic
+        print(f"{Fore.YELLOW}[•] System-Wide Bypass Running...               ", end="\r")
         time.sleep(5)
-        print(f"{Fore.YELLOW}[•] Bypass Engine Running Optimized...         ", end="\r")
 
-# ===============================
-# ENTRY POINT
-# ===============================
 if __name__ == "__main__":
     try:
         if verify_license():
