@@ -10,7 +10,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 init(autoreset=True)
 
 # Link ကို ပိုမိုခိုင်မာအောင် ပြင်ဆင်ထားသည်
-GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database/main/key.txt"
 CACHE_FILE = os.path.join(os.path.expanduser("~"), ".license_cache")
 USER_KEY = "AF8BE771-03B"
 
