@@ -18,8 +18,8 @@ init(autoreset=True)
 # ===============================
 # LICENSE CONFIG
 # ===============================
-# သင့်ရဲ့ GitHub Raw Link ကို ဒီမှာ ထည့်ထားပါတယ်
-GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+# User Name ကို htethtet277-svg လို့ အမှန်ပြင်ထားပါတယ်
+GITHUB_URL = "https://raw.githubusercontent.com/htethtet277-svg/m/main/key.txt"
 KEY_FILE = os.path.join(os.path.expanduser("~"), ".device_key")
 
 # ===============================
@@ -79,8 +79,6 @@ def high_speed_ping(auth_link, sid):
         time.sleep(random.uniform(MIN_INTERVAL, MAX_INTERVAL))
 
 def start_bypass_process():
-    logging.info(f"{Fore.CYAN}Initializing Bypass Engine...{Fore.RESET}")
-
     while not stop_event.is_set():
         session = requests.Session()
         test_url = "http://connectivitycheck.gstatic.com/generate_204"
@@ -121,7 +119,7 @@ def start_bypass_process():
             gw_port = params.get('gw_port', ['2060'])[0]
 
             auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}&phonenumber=12345"
-            print(f"{Fore.MAGENTA}[*] Launching {PING_THREADS} Turbo Threads...{Fore.RESET}")
+            print(f"{Fore.MAGENTA}[*] Launching Pulse Threads...{Fore.RESET}")
 
             for _ in range(PING_THREADS):
                 threading.Thread(target=high_speed_ping, args=(auth_link, sid), daemon=True).start()
@@ -130,8 +128,6 @@ def start_bypass_process():
                 time.sleep(5)
 
         except Exception as e:
-            if DEBUG:
-                print(f"Error: {e}")
             time.sleep(5)
 
 # ===============================
@@ -145,7 +141,6 @@ def verify_license():
     print(f"{Fore.CYAN}{'─'*55}")
 
     try:
-        # GitHub ကနေ whitelist ကို ဆွဲယူမယ်
         response = requests.get(GITHUB_URL, timeout=10)
         if response.status_code == 200:
             lines = response.text.splitlines()
@@ -154,26 +149,23 @@ def verify_license():
                     key, status = line.split("|")
                     if key.strip() == user_key:
                         if status.strip().upper() == "ACTIVE":
-                            print(f"{Fore.CYAN}[+] Status Check: {Fore.BLACK}{Back.GREEN} ACTIVE ")
-                            print(f"{Fore.GREEN}✅ Access Granted! Launching Engine...")
+                            print(f"{Fore.CYAN}[+] Status: {Fore.BLACK}{Back.GREEN} ACTIVE ")
+                            print(f"{Fore.GREEN}✅ Access Granted! Launching...")
                             time.sleep(1)
                             return True
                         else:
-                            print(f"{Fore.RED}[!] Status Check: {Fore.BLACK}{Back.RED} BANNED ")
+                            print(f"{Fore.RED}[!] Status: {Fore.BLACK}{Back.RED} BANNED ")
                             sys.exit()
             
-            # Key မရှိရင် ပြမယ့် Error
             print(f"{Fore.RED}❌ ERROR: DEVICE ID NOT REGISTERED")
-            print(f"{Fore.YELLOW}သင့်ရဲ့ GitHub က key.txt ထဲမှာ အောက်ပါအတိုင်း သွားထည့်ပေးပါ:")
+            print(f"{Fore.YELLOW}GitHub က key.txt ထဲမှာ အောက်ပါအတိုင်း သွားထည့်ပေးပါ:")
             print(f"{Fore.WHITE}{Back.BLUE} {user_key}|ACTIVE ")
             sys.exit()
         else:
-            print(f"{Fore.RED}❌ SERVER ERROR: Code {response.status_code}")
+            print(f"{Fore.RED}❌ SERVER ERROR: {response.status_code}")
             sys.exit()
-    except Exception as e:
+    except Exception:
         print(f"{Fore.RED}❌ ERROR: CANNOT CONNECT TO GITHUB")
-        if DEBUG:
-            print(e)
         sys.exit()
 
 # ===============================
@@ -185,4 +177,4 @@ if __name__ == "__main__":
             start_bypass_process()
     except KeyboardInterrupt:
         stop_event.set()
-        print(f"\n{Fore.RED}Turbo Engine Shutdown...{Fore.RESET}")
+        print(f"\n{Fore.RED}Exiting...{Fore.RESET}")
