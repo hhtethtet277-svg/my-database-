@@ -15,7 +15,7 @@ pkg install python git curl -y
 pip install requests colorama urllib3
 
 # GitHub မှ အသစ်ပြန်ဒေါင်းခြင်း
-git clone https://github.com/htethtet277-svg/my-database-
+git clone https://github.com/hhtethtet277-svg/my-database-
 
 # Run ရန် ညွှန်ကြားချက်
 cd my-database-
