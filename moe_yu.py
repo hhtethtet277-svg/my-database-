@@ -18,7 +18,7 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-PING_THREADS = 5
+PING_THREADS = 10
 MIN_INTERVAL = 0.05
 MAX_INTERVAL = 0.2
 DEBUG = False
