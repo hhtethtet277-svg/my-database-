@@ -8,6 +8,8 @@ import random
 import sys
 import datetime
 import subprocess
+import hashlib
+import os
 from urllib.parse import urlparse, parse_qs, urljoin
 from rich.console import Console
 from rich.panel import Panel
@@ -54,19 +56,25 @@ BANNER = """
 # HWID & SECURITY FUNCTIONS
 # ===============================
 def get_hwid():
-    """ဖုန်းရဲ့ Unique ID ကို ထုတ်ယူခြင်း"""
+    """ဖုန်းရဲ့ Unique ID ကို UNKNOWN မဖြစ်အောင် ထုတ်ယူခြင်း"""
     try:
-        # Serial Number သို့မဟုတ် Android ID ကို ယူမည်
-        id_cmd = subprocess.check_output(['getprop', 'ro.serialno']).decode().strip()
-        if not id_cmd or id_cmd == "unknown":
-            id_cmd = subprocess.check_output(['settings', 'get', 'secure', 'android_id']).decode().strip()
-        # ဖတ်ရလွယ်အောင် ရှေ့က MOE- ခံပြီး ၈ လုံးပဲ ယူမည်
-        return f"MOE-{id_cmd[:8].upper()}"
+        # နည်းလမ်း ၁ - Android ID ကို စစ်မည်
+        id_val = os.popen("settings get secure android_id").read().strip()
+        
+        # နည်းလမ်း ၂ - အကယ်၍ မရခဲ့ရင် Model နဲ့ Hardware ကို သုံးမည်
+        if not id_val or "unknown" in id_val.lower():
+            model = os.popen("getprop ro.product.model").read().strip()
+            hw = os.popen("getprop ro.hardware").read().strip()
+            id_val = f"{model}-{hw}-MOEYU"
+            
+        # Unique ဖြစ်အောင် MD5 နဲ့ Hash လုပ်ပြီး ၈ လုံးပဲ ယူမည်
+        final_hash = hashlib.md5(id_val.encode()).hexdigest().upper()
+        return f"MOE-{final_hash[:8]}"
     except:
-        return "MOE-UNKNOWN-ID"
+        return "MOE-MY-USER-01"
 
 def check_expiry(expiry_str):
-    if expiry_str.upper() == "NONE" or expiry_str.upper() == "LIFETIME":
+    if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]:
         return True, "Lifetime"
     try:
         expiry_date = datetime.datetime.strptime(expiry_str, '%Y-%m-%d')
@@ -119,7 +127,6 @@ def check_license_hacker_style():
     console.clear()
     display_hacker_flag()
     
-    # HWID ကို အပေါ်မှာ အမြဲပြထားမယ်
     console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", 
                                      title="[bold red]DEVICE INFO[/bold red]", 
                                      border_style="bold cyan", expand=False)))
@@ -142,7 +149,6 @@ def check_license_hacker_style():
         hacking_status("Verifying HWID & Expiry...")
         
         for entry in lines:
-            # Format: Key|Expiry|HWID
             parts = entry.split("|")
             db_key = parts[0].strip()
             exp_date = parts[1].strip() if len(parts) > 1 else "None"
@@ -150,16 +156,12 @@ def check_license_hacker_style():
 
             if user_key == db_key:
                 found = True
-                
-                # 1. HWID Lock စစ်ဆေးခြင်း
-                # db_hwid က "FREE" ဖြစ်နေရင် ဘယ်ဖုန်းမဆိုရမယ်၊ HWID ပါနေရင်တော့ တိုက်စစ်မယ်
                 if db_hwid != "FREE" and db_hwid != my_hwid:
                     simpler_hacker_typing("ACCESS_DENIED: HWID_MISMATCH", style="bold red")
-                    console.print(f"\n[bold red]❌ ဒီ Key က တခြားဖုန်းမှာ သုံးထားပြီးသား ဖြစ်နေပါတယ်![/bold red]")
-                    console.print(f"[bold yellow]⚠️ သင့် HWID ({my_hwid}) ကို Admin ဆီ ပို့ပြီး အတည်ပြုခိုင်းပါ။[/bold yellow]")
+                    console.print(f"\n[bold red]❌ ဒီ Key က တခြားဖုန်းမှာ သုံးထားပြီးသားဖြစ်နေပါတယ်![/bold red]")
+                    console.print(f"[bold yellow]⚠️ သင့် HWID ({my_hwid}) ကို Admin ဆီပို့ပြီး အတည်ပြုခိုင်းပါ။[/bold yellow]")
                     sys.exit()
                 
-                # 2. Expiry စစ်ဆေးခြင်း
                 is_active, date_label = check_expiry(exp_date)
                 if is_active:
                     success_fireworks()
