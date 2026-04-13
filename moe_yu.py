@@ -6,6 +6,7 @@ import threading
 import logging
 import random
 import sys
+import datetime
 from urllib.parse import urlparse, parse_qs, urljoin
 from rich.console import Console
 from rich.panel import Panel
@@ -43,10 +44,8 @@ stop_event = threading.Event()
 # ===============================
 # GITHUB DATABASE CONFIG
 # ===============================
-# သင်ပေးထားသော GitHub Raw Link အသစ်
 URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 
-# သင်တောင်းဆိုထားသော Moe Yu Logo Banner
 BANNER = """
 [bold #00FF00]
  ╔╦╗╔═╗╔═╗  ╦ ╦╦ ╦
@@ -94,8 +93,20 @@ def success_fireworks():
         time.sleep(0.2)
 
 # ===============================
-# GITHUB LICENSE CHECK
+# EXPIRY & LICENSE CHECK
 # ===============================
+def check_expiry(expiry_str):
+    try:
+        # Expected format: YYYY-MM-DD (e.g., 2026-05-13)
+        expiry_date = datetime.datetime.strptime(expiry_str, '%Y-%m-%d')
+        current_date = datetime.datetime.now()
+        
+        if current_date > expiry_date:
+            return False, expiry_date.strftime('%d-%b-%Y')
+        return True, expiry_date.strftime('%d-%b-%Y')
+    except:
+        return True, "Lifetime" # ရက်စွဲမှားနေလျှင် သို့မဟုတ် မပါလျှင် Lifetime ဟုသတ်မှတ်မည်
+
 def check_license_hacker_style():
     console.clear()
     display_hacker_flag()
@@ -110,21 +121,42 @@ def check_license_hacker_style():
 
     hacking_status("Connecting to GitHub Database...")
     try:
-        # GitHub မှ Key များလှမ်းဖတ်ခြင်း
         response = requests.get(URL, timeout=10)
-        valid_keys = [k.strip() for k in response.text.splitlines() if k.strip()]
+        # GitHub key.txt ထဲမှာ Key|YYYY-MM-DD ပုံစံဖြင့် သိမ်းဆည်းထားရပါမည်
+        lines = [line.strip() for line in response.text.splitlines() if line.strip()]
         
+        found = False
         hacking_status("Decrypting Database...")
-        if user_key in valid_keys:
-            success_fireworks()
-            simpler_hacker_typing("ACCESS_GRANTED: AUTHENTICATION SUCCESS")
-            return True
-        else:
-            simpler_hacker_typing("ACCESS_DENIED: INVALID_KEY", style="bold red")
-            console.print("\n[bold red]❌ Key မှားယွင်းနေပါသည်။ Admin ထံမှာ ဝယ်ယူပါ။[/bold red]")
-            sys.exit()
+        
+        for entry in lines:
+            if "|" in entry:
+                db_key, exp_date = entry.split("|")
+            else:
+                db_key, exp_date = entry, "None"
+
+            if user_key == db_key:
+                # Key မှန်လျှင် သက်တမ်းစစ်မည်
+                is_active, date_label = check_expiry(exp_date)
+                
+                if is_active:
+                    success_fireworks()
+                    simpler_hacker_typing(f"ACCESS_GRANTED: AUTHENTICATION SUCCESS")
+                    console.print(Align.center(f"[bold green]STATUS: ACTIVE | EXPIRY: {date_label}[/bold green]\n"))
+                    return True
+                else:
+                    simpler_hacker_typing("ACCESS_DENIED: KEY_EXPIRED", style="bold red")
+                    console.print(f"\n[bold red]❌ သင့် Key မှာ သက်တမ်းကုန်ဆုံးသွားပါပြီ ({date_label})[/bold red]")
+                    console.print("[bold yellow]⚠️ ကျေးဇူးပြု၍ Admin ထံတွင် သက်တမ်းတိုးပါ။[/bold yellow]")
+                    sys.exit()
+
+        # Key မတွေ့ရှိပါက
+        simpler_hacker_typing("ACCESS_DENIED: INVALID_KEY", style="bold red")
+        console.print("\n[bold red]❌ Key မှားယွင်းနေပါသည်။ Admin ထံမှာ ဝယ်ယူပါ။[/bold red]")
+        sys.exit()
+
     except Exception as e:
         console.print(f"\n[bold red]📡 DATABASE ERROR: Check internet connection.[/bold red]")
+        if DEBUG: print(e)
         sys.exit()
 
 # ===============================
@@ -234,4 +266,3 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             stop_event.set()
             print(f"\n{RED}Turbo Engine Shutdown...{RESET}")
-
