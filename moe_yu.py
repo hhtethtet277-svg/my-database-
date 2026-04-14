@@ -40,7 +40,7 @@ stop_event = threading.Event()
 
 URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 
-# BABY GAMER / HACKER ASCII ART
+# BABY GAMER LOGO
 BABY_LOGO = """
 [bold cyan]
       _      
@@ -94,7 +94,6 @@ def check_expiry(expiry_str):
 # UI FUNCTIONS
 # ===============================
 def display_hacker_flag():
-    # ဝါစိမ်းနီ အလံအစား Baby Logo ကို အစားထိုးလိုက်သည်
     console.print(Align.center(BABY_LOGO))
     console.print(Align.center(BANNER))
     console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v5.2[/bold cyan]\n"))
@@ -140,6 +139,8 @@ def check_license_hacker_style():
                 if is_active:
                     success_fireworks()
                     simpler_hacker_typing("ACCESS_GRANTED: AUTHENTICATION SUCCESS")
+                    # EXP ကို ဒီမှာ ပြန်ထည့်ထားပါတယ်
+                    console.print(Align.center(f"[bold green]STATUS: ACTIVE | EXPIRY: {date_label}[/bold green]\n"))
                     return True
         console.print("\n[bold red]❌ INVALID KEY![/bold red]")
         sys.exit()
