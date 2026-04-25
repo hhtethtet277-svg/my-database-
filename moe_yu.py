@@ -48,47 +48,61 @@ def start_bypass_process():
     session = requests.Session()
     session.headers.update({'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36'})
     
-    console.print("[yellow][*] Searching for Portal...[/yellow]")
-    try:
-        r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=10, allow_redirects=True)
-        portal_url = r.url
-        page = session.get(portal_url, timeout=10, verify=False)
-        
-        auth_link = None
-        form = re.search(r'<form.*?action=["\'](.*?)["\'].*?>', page.text, re.DOTALL)
-        if form:
-            action = form.group(1)
-            auth_url = action if action.startswith('http') else urljoin(portal_url, action)
-            inputs = re.findall(r'<input.*?name=["\'](.*?)["\'].*?value=["\'](.*?)["\']', page.text)
-            session.post(auth_url, data={name: val for name, val in inputs})
-            auth_link = auth_url
-        else:
-            sid = re.search(r'sessionId=([a-zA-Z0-9]+)', page.text)
-            if sid:
-                p = parse_qs(urlparse(portal_url).query)
-                auth_link = f"http://{p.get('gw_address',['192.168.60.1'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid.group(1)}"
-        
-        if not auth_link:
-            console.print("[red][!] Portal not found.[/red]")
-            return
+    while not stop_event.is_set():
+        console.print("[yellow][*] Searching for Portal...[/yellow]")
+        try:
+            r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=10, allow_redirects=True)
+            portal_url = r.url
+            
+            # အင်တာနက် သုံးလို့ရနေရင် (204 မဟုတ်ဘဲ 200 ဖြစ်နေရင်) Portal ရှာစရာမလိုတော့ပါ
+            if r.status_code == 204:
+                page = session.get(portal_url, timeout=10, verify=False)
+                auth_link = None
+                
+                # Old Portal (Form)
+                form = re.search(r'<form.*?action=["\'](.*?)["\'].*?>', page.text, re.DOTALL)
+                if form:
+                    action = form.group(1)
+                    auth_url = action if action.startswith('http') else urljoin(portal_url, action)
+                    inputs = re.findall(r'<input.*?name=["\'](.*?)["\'].*?value=["\'](.*?)["\']', page.text)
+                    session.post(auth_url, data={name: val for name, val in inputs})
+                    auth_link = auth_url
+                else:
+                    # New Portal (Wifidog)
+                    sid = re.search(r'sessionId=([a-zA-Z0-9]+)', page.text)
+                    if sid:
+                        p = parse_qs(urlparse(portal_url).query)
+                        auth_link = f"http://{p.get('gw_address',['192.168.60.1'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid.group(1)}"
+                
+                if not auth_link:
+                    console.print("[yellow][!] Portal မတွေ့သေးပါ။ 5 စက္ကန့် စောင့်ပြီး ပြန်စစ်နေသည်...[/yellow]")
+                    time.sleep(5)
+                    continue 
+                
+                # Auth တွေ့သွားရင် Ping Loop စမယ်
+                console.print("[green][✓] Auth Link Found! Starting Aggressive Pulse...[/green]")
+                def pulse_ping(is_main):
+                    while not stop_event.is_set():
+                        try: 
+                            session.get(auth_link, timeout=5)
+                            if is_main:
+                                sys.stdout.write(f"\r[green]✓[/green] [bold white]အင်တာနက် ချိတ်သွားပါပြီး အသုံးပြုလို့ရပါပြီ[/bold white]")
+                                sys.stdout.flush()
+                        except: pass
+                        time.sleep(2)
 
-        # Pulse Ping
-        def pulse_ping(is_main):
-            while not stop_event.is_set():
-                try: 
-                    session.get(auth_link, timeout=5)
-                    if is_main:
-                        sys.stdout.write(f"\r[green]✓[/green] [bold white]အင်တာနက် ချိတ်သွားပါပြီး အသုံးပြုလို့ရပါပြီ[/bold white]")
-                        sys.stdout.flush()
-                except: pass
-                time.sleep(2)
+                for i in range(PING_THREADS):
+                    threading.Thread(target=pulse_ping, args=(i==0,), daemon=True).start()
+                
+                while True: time.sleep(10)
+            else:
+                # အင်တာနက် ရနေရင်
+                console.print("[green][✓] အင်တာနက် ချိတ်ဆက်ပြီးသား ဖြစ်နေပါသည်။[/green]")
+                time.sleep(10)
 
-        for i in range(PING_THREADS):
-            threading.Thread(target=pulse_ping, args=(i==0,), daemon=True).start()
-        
-        while True: time.sleep(10) 
-    except Exception as e:
-        console.print(f"[red][!] Error: {e}[/red]")
+        except Exception as e:
+            console.print(f"[red][!] Error: {e}. 5 စက္ကန့် စောင့်ပြီး ပြန်ကြိုးစားမည်...[/red]")
+            time.sleep(5)
 
 if __name__ == "__main__":
     if check_license_hacker_style():
