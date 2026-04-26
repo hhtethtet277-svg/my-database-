@@ -1,4 +1,4 @@
-imiport requests
+import requests
 import re
 import urllib3
 import time
