@@ -23,7 +23,7 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-PING_THREADS = 3
+PING_THREADS = 5
 MIN_INTERVAL = 0.05
 MAX_INTERVAL = 0.2
 
