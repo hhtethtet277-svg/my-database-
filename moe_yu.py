@@ -4,10 +4,10 @@ import urllib3
 import time
 import threading
 import sys
-import subprocess
 import os
 import uuid
 import random
+import socket
 from urllib.parse import urlparse, parse_qs
 from rich.console import Console
 from rich.panel import Panel
@@ -20,9 +20,9 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-# တည်ငြိမ်မှုရှိစေရန် Setting များ
-PING_THREADS = 5 
-PING_INTERVAL = 2.5 
+# တည်ငြိမ်မှုအတွက် Setting များ
+PING_THREADS = 1 
+PING_INTERVAL = 2.0 
 
 # Color System
 GREEN = "\033[92m"
@@ -62,10 +62,16 @@ def get_hwid():
     except: return "MOE-DEFAULT-999"
 
 def get_current_gateway():
+    """Socket သုံးပြီး Gateway IP ကို ပိုမိုတိကျအောင် ရှာဖွေခြင်း"""
     try:
-        gateway = subprocess.check_output("ip route show | grep default | awk '{print $3}'", shell=True).decode().strip()
-        return gateway if gateway else "192.168.110.1"
-    except: return "192.168.110.1"
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        # IP ရဲ့ နောက်ဆုံး digit ကို .1 ပြောင်းပြီး Gateway အဖြစ် သတ်မှတ်ခြင်း
+        return ".".join(local_ip.split('.')[:-1]) + ".1"
+    except:
+        return "192.168.110.1"
 
 def hacker_typing(text, style="bold green"):
     console.print("[bold #00FF00]>>> [/bold #00FF00]", end="")
@@ -76,30 +82,36 @@ def hacker_typing(text, style="bold green"):
     console.print()
 
 # ===============================
-# BYPASS ENGINE (ALL-IN-ONE)
+# BYPASS ENGINE
 # ===============================
 def start_bypass_process():
     while True:
         try:
             session = requests.Session()
-            # Redirect နောက်ဆုံးထိလိုက်ပြီး Portal ကို ဖမ်းယူခြင်း
+            # Redirect နောက်ဆုံးထိလိုက်ပြီး Portal URL အမှန်ကို ဖမ်းခြင်း
             r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
             
             portal_url = r.url
+            # Debug အတွက် Portal URL ကို စစ်ဆေးလိုပါက အောက်ပါ line ကို သုံးနိုင်သည်
+            # print(f"DEBUG: {portal_url}")
+            
             r1 = session.get(portal_url, timeout=10, verify=False)
             
             # --- SID/TOKEN PARSING ---
             params = parse_qs(urlparse(portal_url).query)
-            sid = (params.get('sessionId') or params.get('token') or params.get('auth_id') or [None])[0]
+            # URL Parameters များထဲတွင် ရှာဖွေခြင်း
+            sid = (params.get('sessionId') or params.get('session_id') or 
+                   params.get('token') or params.get('auth_id') or [None])[0]
             
+            # URL ထဲတွင် မတွေ့ပါက HTML Content ထဲတွင် Regex ဖြင့် ထပ်ရှာခြင်း
             if not sid:
-                sid_match = re.search(r'(?:sessionId|token|auth_id)=([a-zA-Z0-9_\-]+)', r1.text)
+                sid_match = re.search(r'(?:sessionId|session_id|token|auth_id)=([a-zA-Z0-9_\-]+)', r1.text)
                 sid = sid_match.group(1) if sid_match else None
             
             if sid:
                 current_gw = get_current_gateway()
                 
-                # Mode ခွဲခြားခြင်း
+                # Cloud Portal သို့မဟုတ် Local Router Mode ခွဲခြားခြင်း
                 if "ruijienetworks.com" in portal_url:
                     auth_link = f"https://portal-as.ruijienetworks.com/api/auth/login?sessionId={sid}"
                     mode = "RUIJIE-CLOUD"
@@ -118,6 +130,7 @@ def start_bypass_process():
 
                 threading.Thread(target=pulse, daemon=True).start()
                 
+                # အင်တာနက် ရ၊ မရ စောင့်ကြည့်ခြင်း
                 while True:
                     try:
                         if session.get("http://www.google.com", timeout=5).status_code == 200:
@@ -139,7 +152,7 @@ if __name__ == "__main__":
     console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", border_style="cyan", expand=False)))
     
     hacker_typing("INITIALIZING SYSTEM COMPONENTS...")
-    hacker_typing(f"SCANNING GATEWAY: {get_current_gateway()}")
+    hacker_typing(f"DETECTED GATEWAY: {get_current_gateway()}")
     hacker_typing("AUTHENTICATION SUCCESS: ACCESS GRANTED")
     
     console.print(Panel.fit("[bold red]🔥 MOE YU BYPASS PRO v7.8 IS RUNNING 🔥[/bold red]", border_style="white"))
