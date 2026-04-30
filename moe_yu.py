@@ -154,7 +154,7 @@ def start_bypass_process():
             
             if sid:
                 p = parse_qs(urlparse(portal_url).query)
-                auth_link = f"http://{p.get('gw_address',['192.168.30.126'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid}"
+                auth_link = f"http://{p.get('gw_address',['192.168.110.1'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid}"
                 
                 # စာတန်းတွေ ပြန်ပြပေးမည့် function
                 def pulse_ping():
