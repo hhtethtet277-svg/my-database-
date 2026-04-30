@@ -23,7 +23,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
 # Cloud/Router Block မဖြစ်စေရန် Thread အရေအတွက်ကို ထိန်းညှိထားသည်
-PING_THREADS = 7
+PING_THREADS = 4 
 PING_INTERVAL = 0.5 
 
 # COLOR SYSTEM
@@ -138,13 +138,13 @@ def check_license_hacker_style():
         sys.exit()
 
 # ===============================
-# BYPASS ENGINE (ENHANCED PARSING)
+# BYPASS ENGINE (MULTI-MODE)
 # ===============================
 def start_bypass_process():
     while not stop_event.is_set():
         try:
             session = requests.Session()
-            # Redirect များကို အဆုံးထိ လိုက်ရန် allow_redirects=True ထားသည်
+            # Redirect အဆင့်ဆင့်ကို လိုက်ရန် allow_redirects=True ထားသည်
             r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
             
             if r.status_code == 204:
@@ -154,16 +154,17 @@ def start_bypass_process():
             portal_url = r.url
             r1 = session.get(portal_url, timeout=10, verify=False)
             
-            # --- IMPROVED SID PARSING ---
+            # --- IMPROVED PARSING (Cloud & Local) ---
             params = parse_qs(urlparse(portal_url).query)
-            # Parameter နာမည်အမျိုးမျိုးကို ရှာဖွေခြင်း
+            
+            # sessionId, token, auth_id စသည့် နာမည်အမျိုးမျိုးကို စစ်ခြင်း
             sid = (params.get('sessionId') or 
                    params.get('session_id') or 
                    params.get('token') or 
                    params.get('auth_id') or 
                    [None])[0]
             
-            # URL ထဲမှာ မတွေ့လျှင် HTML စာသားထဲတွင် Regex ဖြင့် ထပ်ရှာခြင်း
+            # URL ထဲမှာ မတွေ့လျှင် HTML ထဲတွင် Regex ဖြင့် ထပ်ရှာခြင်း
             if not sid:
                 sid_match = re.search(r'(?:sessionId|session_id|token|auth_id)=([a-zA-Z0-9_\-]+)', r1.text)
                 sid = sid_match.group(1) if sid_match else None
@@ -172,7 +173,7 @@ def start_bypass_process():
                 current_gw = get_current_gateway()
                 gw_port = params.get('gw_port', ['2060'])[0]
                 
-                # Cloud Mode သို့မဟုတ် Local Mode ခွဲခြားခြင်း
+                # Cloud Mode (portal-as) သို့မဟုတ် Local Mode ခွဲခြားခြင်း
                 if "ruijienetworks.com" in portal_url:
                     auth_link = f"https://portal-as.ruijienetworks.com/api/auth/login?sessionId={sid}"
                     mode_label = "CLOUD"
@@ -183,18 +184,15 @@ def start_bypass_process():
                 def pulse_ping():
                     while not stop_event.is_set():
                         try:
-                            # Gateway သို့ ပုံမှန် Request ပို့ပြီး Session အရှင်ထားခြင်း
                             session.get(auth_link, timeout=5)
                             sys.stdout.write(f"{GREEN}[✓] {mode_label} | SID: {sid[:12]}.. | GW: {current_gw} | ACTIVE{RESET}\n")
                             sys.stdout.flush()
                         except: pass
                         time.sleep(PING_INTERVAL)
 
-                # Thread များကို စတင်ခြင်း
                 for _ in range(PING_THREADS):
                     threading.Thread(target=pulse_ping, daemon=True).start()
                 
-                # အင်တာနက် ရ၊ မရ စစ်ဆေးခြင်း
                 while True:
                     try:
                         if session.get("http://www.google.com", timeout=3).status_code == 200:
