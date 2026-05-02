@@ -7,20 +7,28 @@ import random
 import sys
 import datetime
 import os
-from urllib.parse import urlparse, parse_qs, urljoin
+from urllib.parse import urlparse, parse_qs
 from rich.console import Console
+from rich.panel import Panel
 from rich.align import Align
 
+# --- Configuration ---
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 stop_event = threading.Event()
 
+# Colors
 GREEN = "\033[1;32m"
 CYAN = "\033[1;36m"
 WHITE = "\033[1;37m"
 RED = "\033[1;31m"
+YELLOW = "\033[1;33m"
 RESET = "\033[0m"
 
+# GitHub Key database
+KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+
+# --- UI Design ---
 AI_BANNER = """
 [bold cyan]
   █████  ██     ██████  ██████  ██████  ███████ 
@@ -29,41 +37,46 @@ AI_BANNER = """
  ██   ██ ██     ██   ██ ██      ██           ██ 
  ██   ██ ██     ██████  ██      ██      ███████ 
 [/bold cyan]
-[bold white] >>> STARLINK & RUIJIE AUTO-BYPASS PRO <<< [/bold white]
+[bold white] >>> GAMING MODE VOUCHER BYPASS SYSTEM <<< [/bold white]
 """
 
+def get_hwid():
+    # ပုံထဲကအတိုင်း Device ID ထုတ်ပေးခြင်း
+    return "KEY-2B6F4CE00A"
+
+def display_activation_screen(hwid):
+    console.clear()
+    console.print(Align.center(AI_BANNER))
+    info = f"""
+[bold yellow]╔══════════════════════════════════════════╗[/bold yellow]
+[bold yellow]║[/bold yellow] [cyan]DEVICE ID[/cyan]   : [green]{hwid}[/green]          [bold yellow]║[/bold yellow]
+[bold yellow]║[/bold yellow] [cyan]STATUS[/cyan]      : [red]PENDING ACTIVATION[/red]    [bold yellow]║[/bold yellow]
+[bold yellow]╚══════════════════════════════════════════╝[/bold yellow]
+"""
+    console.print(Align.center(info))
+
+# --- Core Logic ---
 def get_sid_automatically():
-    """Voucher Page ကနေ SID ကို Auto နှိုက်ယူတဲ့စနစ်"""
+    # Ruijie/Starlink portal ကို ရှာဖွေခြင်း
     try:
-        session = requests.Session()
-        # Google ဆီကို အရင်သွားပြီး Portal Link ကို ဖမ်းယူခြင်း
-        res = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
+        res = requests.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
         portal_url = res.url
-        
-        # URL ထဲက sessionId ကို ရှာခြင်း
-        parsed_url = urlparse(portal_url)
-        params = parse_qs(parsed_url.query)
+        params = parse_qs(urlparse(portal_url).query)
         sid = params.get('sessionId', [None])[0]
-        
-        if not sid:
-            # URL ထဲမှာ မပါရင် Page ထဲက Code ထဲမှာ ထပ်ရှာခြင်း
-            res_page = session.get(portal_url, timeout=5, verify=False)
-            sid_match = re.search(r'sessionId=([a-zA-Z0-9\-]+)', res_page.text)
-            sid = sid_match.group(1) if sid_match else None
-            
         return sid, portal_url
     except:
         return None, None
 
 def pulse_log(sid):
+    # Bypass လုပ်ဆောင်ချက်ပြသခြင်း (Video ထဲကအတိုင်း)
     while not stop_event.is_set():
         ts = datetime.datetime.now().strftime("%H:%M:%S")
         core_id = random.randint(100000, 999999)
-        sys.stdout.write(f"{WHITE}[{ts}]{RESET} {GREEN}AI_CORE: THR=30 SID={sid}{RESET}\n{GREEN}BYPASSING_PORTAL... ODE={core_id}{RESET}\n")
+        sys.stdout.write(f"{WHITE}[{ts}]{RESET} {GREEN}AI_CORE: THR=30 INT=0.01s SID={sid}{RESET}\n{GREEN}ODE={core_id}...{RESET}\n")
         sys.stdout.flush()
-        time.sleep(0.05)
+        time.sleep(0.04)
 
-def start_engine():
+def start_bypass_engine():
     console.clear()
     console.print(Align.center(AI_BANNER))
     print(f"{CYAN}[*] SEARCHING FOR VOUCHER PORTAL...{RESET}")
@@ -72,31 +85,39 @@ def start_engine():
     
     if sid:
         print(f"{GREEN}[+] PORTAL FOUND! SID: {sid}{RESET}")
-        print(f"{GREEN}[+] STARLINK/RUIJIE DETECTED. STARTING ENGINE...{RESET}\n")
-        
-        # Bypass Request ပို့ခြင်း (Ruijie Auth Logic)
+        # Auth request ပို့ခြင်း
         try:
             p = parse_qs(urlparse(portal_url).query)
-            gw_addr = p.get('gw_address', ['192.168.110.1'])[0]
-            gw_port = p.get('gw_port', ['2060'])[0]
-            auth_url = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}"
+            auth_url = f"http://{p.get('gw_address',['192.168.110.1'])[0]}:{p.get('gw_port',['2060'])[0]}/wifidog/auth?token={sid}"
             requests.get(auth_url, timeout=5)
         except: pass
 
         threading.Thread(target=pulse_log, args=(sid,), daemon=True).start()
-        
-        while True:
-            try:
-                # ၅ စက္ကန့်တစ်ခါ အင်တာနက်စစ်ပြီး အလိုအလျောက် Refresh လုပ်ပေးခြင်း
-                if requests.get("http://www.google.com", timeout=3).status_code == 200:
-                    time.sleep(10)
-                else:
-                    # အင်တာနက် ပြန်ပြတ်သွားရင် SID အသစ်ပြန်ယူ
-                    sid, _ = get_sid_automatically()
-            except: time.sleep(2)
+        while True: time.sleep(1)
     else:
         print(f"{RED}[!] PORTAL NOT FOUND. PLEASE CONNECT TO WIFI FIRST!{RESET}")
 
+# --- Activation & Main ---
+def main():
+    hwid = get_hwid()
+    display_activation_screen(hwid)
+    
+    key_input = console.input(f"\n{CYAN}[?] Activation Key: {RESET}")
+    
+    # Key စစ်ဆေးခြင်း
+    try:
+        response = requests.get(KEY_URL, timeout=10)
+        valid_keys = response.text.splitlines()
+        
+        if key_input in valid_keys:
+            console.print(f"\n{GREEN}[+] ACTIVATION SUCCESSFUL!{RESET}")
+            time.sleep(1.5)
+            start_bypass_engine()
+        else:
+            console.print(f"\n{RED}[!] INVALID ACTIVATION KEY!{RESET}")
+    except:
+        console.print(f"\n{RED}[!] SERVER ERROR. CHECK INTERNET!{RESET}")
+
 if __name__ == "__main__":
-    try: start_engine()
+    try: main()
     except KeyboardInterrupt: sys.exit()
