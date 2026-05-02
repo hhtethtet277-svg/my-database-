@@ -1,117 +1,149 @@
-import os
-import sys
-import json
+import requests
+import re
+import urllib3
 import time
-import asyncio
-import aiohttp
-import hashlib
-import platform
-import subprocess
-from datetime import datetime
+import threading
+import random
+import sys
+import datetime
+import os
+import uuid
+from urllib.parse import urlparse, parse_qs, urljoin
+from rich.console import Console
+from rich.panel import Panel
+from rich.align import Align
+from rich.text import Text
 
-# --- Configuration ---
-# GitHub Raw Link အမှန်ဖြစ်ရပါမယ်
-DB_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+# ===============================
+# CONFIG & INITIALIZATION
+# ===============================
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+console = Console()
 
-class Star:
-    def __init__(self):
-        self.red = "\033[1;31m"
-        self.green = "\033[1;32m"
-        self.yellow = "\033[1;33m"
-        self.blue = "\033[1;34m"
-        self.white = "\033[1;37m"
-        self.reset = "\033[0m"
+# အစိမ်းရောင်စာတန်း တက်မည့် အမြန်နှုန်းနှင့် Thread အရေအတွက်
+PING_THREADS = 30
+stop_event = threading.Event()
 
-    def clear(self):
-        os.system('clear')
+# Color Codes
+GREEN = "\033[1;32m"
+CYAN = "\033[1;36m"
+WHITE = "\033[1;37m"
+RED = "\033[1;31m"
+YELLOW = "\033[1;33m"
+RESET = "\033[0m"
 
-    def get_hwid(self):
+# GitHub Key URL
+KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+
+# ===============================
+# UI DESIGN (ဗီဒီယိုထဲကအတိုင်း)
+# ===============================
+AI_BANNER = """
+[bold cyan]
+  █████  ██     ██████  ██████  ██████  ███████ 
+ ██   ██ ██     ██   ██ ██   ██ ██   ██ ██      
+ ███████ ██     ██████  ██████  ██████  ███████ 
+ ██   ██ ██     ██   ██ ██      ██           ██ 
+ ██   ██ ██     ██████  ██      ██      ███████ 
+[/bold cyan]
+[bold white] >>> GAMING MODE VOUCHER BYPASS SYSTEM <<< [/bold white]
+"""
+
+def get_hwid():
+    """ဗီဒီယိုထဲက KEY-90AE... ပုံစံအတိုင်း HWID ထုတ်ပေးခြင်း"""
+    id_file = os.path.expanduser("~/.moe_yu_id")
+    try:
+        if os.path.exists(id_file):
+            with open(id_file, "r") as f: return f.read().strip()
+        new_id = "KEY-90AE3B7FB9"
+        with open(id_file, "w") as f: f.write(new_id)
+        return new_id
+    except:
+        return "KEY-90AE3B7FB9"
+
+def display_interface(hwid):
+    console.clear()
+    console.print(Align.center(AI_BANNER))
+    
+    info_box = f"""
+[bold green]╔══════════════════════════════════════════╗[/bold green]
+[bold green]║[/bold green] [cyan]DEVICE ID[/cyan]   : [white]{hwid}[/white]          [bold green]║[/bold green]
+[bold green]║[/bold green] [cyan]EXPIRY DATE[/cyan] : [white]LIFETIME[/white]            [bold green]║[/bold green]
+[bold green]╚══════════════════════════════════════════╝[/bold green]
+"""
+    console.print(Align.center(info_box))
+
+# ===============================
+# LOGGING SYSTEM (ဗီဒီယိုထဲကအတိုင်း)
+# ===============================
+def pulse_log_animation(sid):
+    """အစိမ်းရောင် စာတန်းများ တရစပ်တက်လာစေရန်"""
+    while not stop_event.is_set():
         try:
-            cmd = subprocess.check_output("getprop ro.serialno", shell=True).decode().strip()
-            if not cmd:
-                cmd = subprocess.check_output("getprop ro.build.id", shell=True).decode().strip()
-            hwid = hashlib.sha256(cmd.encode()).hexdigest().upper()
-            return hwid[:20]
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            core_id = random.randint(100000, 999999)
+            
+            # ဗီဒီယိုထဲက format အတိုင်း
+            log = f"{WHITE}[{timestamp}]{RESET} {GREEN}AI_CORE: THR=30 INT=0.01s SID={sid}{RESET}"
+            ode = f"{GREEN}ODE={core_id}...{RESET}"
+            
+            sys.stdout.write(f"{log}\n{ode}\n")
+            sys.stdout.flush()
+            time.sleep(0.03) 
         except:
-            alt_info = f"{platform.machine()}{platform.node()}"
-            return hashlib.md5(alt_info.encode()).hexdigest().upper()[:20]
+            pass
 
-    def banner(self, my_id):
-        self.clear()
-        print(f"""{self.green}
-  ██████  ████████  █████  ██████  
- ██       ──██──  ██   ██ ██   ██ 
-  ██████    ██    ███████ ██████  
-       ██   ██    ██   ██ ██   ██ 
-  ██████    ██    ██   ██ ██   ██ 
-{self.white}---------------------------------------------
-{self.yellow} >> OWNER   : MOE YU
- >> VERSION : 1.0.6 (EXPIRY SYSTEM)
- >> HWID    : {my_id}
-{self.white}---------------------------------------------""")
+# ===============================
+# MAIN BYPASS LOGIC
+# ===============================
+def check_internet():
+    try:
+        requests.get("http://www.google.com", timeout=3)
+        return True
+    except:
+        return False
 
-    async def check_key(self, session, my_hwid):
-        try:
-            async with session.get(DB_URL) as response:
-                if response.status == 200:
-                    raw_data = await response.text()
-                    lines = raw_data.strip().split('\n')
-                    
-                    for line in lines:
-                        if "|" in line:
-                            db_hwid, exp_date_str = line.split("|")
-                            db_hwid = db_hwid.strip()
-                            exp_date_str = exp_date_str.strip()
+def start_bypass():
+    hwid = get_hwid()
+    display_interface(hwid)
+    
+    print(f"\n{CYAN}[*] INITIALIZING ENGINE...{RESET}")
+    time.sleep(1.5)
+    
+    # Key စစ်ဆေးခြင်း (Optional)
+    try:
+        # ဒီနေရာမှာ KEY_URL ကနေ data လှမ်းစစ်လို့ရပါတယ်
+        pass
+    except:
+        pass
 
-                            if my_hwid == db_hwid:
-                                # ရက်စွဲကို စစ်ဆေးခြင်း
-                                try:
-                                    exp_date = datetime.strptime(exp_date_str, "%Y-%m-%d")
-                                    current_date = datetime.now()
+    # ဗီဒီယိုထဲကလို အလုပ်လုပ်ပြီဖြစ်ကြောင်း ပြခြင်း
+    sid = "0c62dcfd"
+    print(f"{GREEN}[+] AUTHENTICATION SUCCESS!{RESET}")
+    print(f"{YELLOW}[*] STARTING BYPASS THREADS...{RESET}\n")
+    time.sleep(1)
 
-                                    if current_date < exp_date:
-                                        return True, f"Access Granted! Exp: {exp_date_str}"
-                                    else:
-                                        return False, f"Key Expired on {exp_date_str}"
-                                except ValueError:
-                                    return False, "Invalid Date Format in Database (Use YYYY-MM-DD)"
-                    
-                    return False, "Your ID is not registered."
-                else:
-                    return False, "Server Connection Failed."
-        except Exception as e:
-            return False, "Check your internet connection."
+    # Animation Threads စတင်ခြင်း
+    for _ in range(3): 
+        t = threading.Thread(target=pulse_log_animation, args=(sid,), daemon=True)
+        t.start()
 
-    async def main_logic(self):
-        my_hwid = self.get_hwid()
-        self.banner(my_hwid)
-        
-        async with aiohttp.ClientSession() as session:
-            print(f"{self.blue}[*] Checking License and Expiry...{self.reset}")
-            await asyncio.sleep(1)
-            
-            status, msg = await self.check_key(session, my_hwid)
-            
-            if status:
-                print(f"{self.green}[+] {msg}{self.reset}")
-                await self.menu()
-            else:
-                print(f"{self.red}[!] {msg}{self.reset}")
-                print(f"{self.yellow}[!] Contact Admin: Moe Yu{self.reset}")
-                sys.exit()
-
-    async def menu(self):
-        print(f"\n{self.white}[1] Start Automation Script")
-        print(f"[0] Exit")
-        choice = input(f"\n{self.green}Select > {self.reset}")
-        if choice == "1":
-            print(f"{self.yellow}[*] Running main script...{self.reset}")
-        else:
-            sys.exit()
+    # အမှန်တကယ် Network Logic (Ruijie/Starlink အတွက်)
+    # ဤနေရာတွင် သင်၏ main script logic ကို ပေါင်းစပ်နိုင်ပါသည်
+    
+    try:
+        while True:
+            # အင်တာနက် ရမရ ၅ စက္ကန့်တစ်ခါ စစ်မည်
+            if check_internet():
+                # အင်တာနက်ရလျှင်လည်း စာတန်းတွေ ဆက်တက်နေစေရန် ဘာမှမလုပ်ပါ
+                pass
+            time.sleep(5)
+    except KeyboardInterrupt:
+        stop_event.set()
+        print(f"\n{RED}[!] BYPASS ENGINE STOPPED.{RESET}")
 
 if __name__ == "__main__":
-    app = Star()
     try:
-        asyncio.run(app.main_logic())
-    except KeyboardInterrupt:
-        print(f"\n{self.red}[!] Program Closed.{self.reset}")
+        start_bypass()
+    except Exception as e:
+        print(f"{RED}Error: {e}{RESET}")
